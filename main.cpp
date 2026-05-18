@@ -5,7 +5,8 @@
 #include <map>
 #include <stdexcept>
 #include <memory>
-
+#include <fstream>
+#include <sstream>
 using namespace std;
 
 // --- Lexer ---
@@ -231,16 +232,7 @@ private:
     }
 };
 
-int main() {
-    string sourceCode = 
-        "let a = 10;\n"
-        "let b = 20;\n"
-        "let result = a + b * 2;\n"
-        "print result;\n";
-
-    cout << "Executing EpilespyLang Code:\n" << sourceCode << "\n";
-    cout << "Output:\n";
-
+void run(const string& sourceCode, Interpreter& interpreter) {
     try {
         Lexer lexer(sourceCode);
         vector<Token> tokens = lexer.tokenize();
@@ -248,11 +240,45 @@ int main() {
         Parser parser(tokens);
         auto ast = parser.parse();
 
-        Interpreter interpreter;
         interpreter.execute(ast);
     } catch (const exception& e) {
         cerr << "Error: " << e.what() << endl;
     }
+}
 
+void runFile(const string& path) {
+    ifstream file(path);
+    if (!file.is_open()) {
+        cerr << "Could not open file: " << path << endl;
+        return;
+    }
+    stringstream buffer;
+    buffer << file.rdbuf();
+    Interpreter interpreter;
+    run(buffer.str(), interpreter);
+}
+
+void runPrompt() {
+    Interpreter interpreter;
+    string line;
+    cout << "EpilespyLang REPL\nType 'exit' to quit.\n";
+    while (true) {
+        cout << "> ";
+        if (!getline(cin, line)) break;
+        if (line == "exit") break;
+        if (line.empty()) continue;
+        run(line, interpreter);
+    }
+}
+
+int main(int argc, char* argv[]) {
+    if (argc > 2) {
+        cout << "Usage: epilespylang [script]" << endl;
+        return 1;
+    } else if (argc == 2) {
+        runFile(argv[1]);
+    } else {
+        runPrompt();
+    }
     return 0;
 }
