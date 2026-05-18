@@ -7,11 +7,12 @@
 #include <memory>
 #include <fstream>
 #include <sstream>
+#include <algorithm>
 using namespace std;
 
 // --- Lexer ---
 enum class TokenType {
-    LET, PRINT, IDENTIFIER, NUMBER, EQUALS, 
+    LET, PRINT, HELP, AUTO, IDENTIFIER, NUMBER, EQUALS, 
     PLUS, MINUS, MULTIPLY, DIVIDE, SEMICOLON, END_OF_FILE
 };
 
@@ -45,6 +46,8 @@ public:
                 }
                 if (id == "let") tokens.push_back({TokenType::LET, id});
                 else if (id == "print") tokens.push_back({TokenType::PRINT, id});
+                else if (id == "help") tokens.push_back({TokenType::HELP, id});
+                else if (id == "auto") tokens.push_back({TokenType::AUTO, id});
                 else tokens.push_back({TokenType::IDENTIFIER, id});
                 continue;
             }
@@ -114,6 +117,27 @@ struct PrintStmtNode : public StmtNode {
     PrintStmtNode(unique_ptr<ExprNode> expr) : expr(move(expr)) {}
 };
 
+struct HelpStmtNode : public StmtNode {};
+
+// --- Helper ---
+int levenshtein(const string& s1, const string& s2) {
+    size_t m = s1.size();
+    size_t n = s2.size();
+    vector<vector<int>> dp(m + 1, vector<int>(n + 1));
+    for (size_t i = 0; i <= m; i++) dp[i][0] = i;
+    for (size_t j = 0; j <= n; j++) dp[0][j] = j;
+    for (size_t i = 1; i <= m; i++) {
+        for (size_t j = 1; j <= n; j++) {
+            if (tolower(s1[i - 1]) == tolower(s2[j - 1])) {
+                dp[i][j] = dp[i - 1][j - 1];
+            } else {
+                dp[i][j] = 1 + min({dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]});
+            }
+        }
+    }
+    return dp[m][n];
+}
+
 // --- Parser ---
 class Parser {
     vector<Token> tokens;
@@ -139,18 +163,42 @@ public:
 
 private:
     unique_ptr<StmtNode> parseStatement() {
-        if (peek().type == TokenType::LET) {
+        TokenType type = peek().type;
+        if (type == TokenType::IDENTIFIER) {
+            string val = peek().value;
+            if (levenshtein(val, "let") <= 2) type = TokenType::LET;
+            else if (levenshtein(val, "print") <= 2) type = TokenType::PRINT;
+            else if (levenshtein(val, "help") <= 2) type = TokenType::HELP;
+            else if (levenshtein(val, "auto") <= 2) type = TokenType::AUTO;
+        }
+
+        if (type == TokenType::AUTO || peek().type == TokenType::AUTO) {
+            // Deduce intent
+            if (pos + 2 < tokens.size() && tokens[pos+1].type == TokenType::IDENTIFIER && tokens[pos+2].type == TokenType::EQUALS) {
+                type = TokenType::LET;
+            } else if (pos + 1 < tokens.size() && tokens[pos+1].type == TokenType::SEMICOLON) {
+                type = TokenType::HELP;
+            } else {
+                type = TokenType::PRINT;
+            }
+        }
+
+        if (type == TokenType::LET || peek().type == TokenType::LET) {
             consume(); // let
             string name = expect(TokenType::IDENTIFIER).value;
             expect(TokenType::EQUALS);
             auto expr = parseExpression();
             expect(TokenType::SEMICOLON);
             return make_unique<LetStmtNode>(name, move(expr));
-        } else if (peek().type == TokenType::PRINT) {
+        } else if (type == TokenType::PRINT || peek().type == TokenType::PRINT) {
             consume(); // print
             auto expr = parseExpression();
             expect(TokenType::SEMICOLON);
             return make_unique<PrintStmtNode>(move(expr));
+        } else if (type == TokenType::HELP || peek().type == TokenType::HELP) {
+            consume(); // help
+            expect(TokenType::SEMICOLON);
+            return make_unique<HelpStmtNode>();
         }
         throw runtime_error("Unknown statement");
     }
@@ -206,6 +254,13 @@ private:
             env[letStmt->name] = evaluate(letStmt->expr.get());
         } else if (auto printStmt = dynamic_cast<PrintStmtNode*>(stmt)) {
             cout << evaluate(printStmt->expr.get()) << endl;
+        } else if (dynamic_cast<HelpStmtNode*>(stmt)) {
+            cout << "EpilespyLang Help:\n"
+                 << "  let <var> = <expr>;   - Assign a value to a variable\n"
+                 << "  print <expr>;         - Print the value of an expression\n"
+                 << "  help;                 - Show this help message\n"
+                 << "  auto ...              - Automatically guess if you meant let or print\n"
+                 << "Note: Commands are typo-tolerant (up to 2 mistakes)!\n";
         }
     }
 
