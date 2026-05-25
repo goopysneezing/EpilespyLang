@@ -1,0 +1,31 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "EpilespyLang Run Active Script",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/EpilespyLang.exe",
+            "args": [
+                "${file}"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "console": "integratedTerminal",
+            "preLaunchTask": "Build EpilespyLang"
+        },
+        {
+            "name": "EpilespyLang CMD (REPL) Mode",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/EpilespyLang.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "console": "integratedTerminal",
+            "preLaunchTask": "Build EpilespyLang"
+        }
+    ]
+}

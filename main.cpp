@@ -1,0 +1,158 @@
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <vector>
+#include <exception>
+#include <cstdlib>
+#include "value.hpp"
+#include "ast.hpp"
+#include "lexer.hpp"
+#include "parser.hpp"
+#include "environment.hpp"
+#include "interpreter.hpp"
+
+// Utility to check if braces/parens are balanced for multi-line block parsing in REPL
+bool isBalanced(const std::string& code) {
+    int braces = 0;
+    int parens = 0;
+    int brackets = 0;
+    bool inString = false;
+    bool escape = false;
+
+    for (size_t i = 0; i < code.length(); ++i) {
+        char c = code[i];
+        if (escape) {
+            escape = false;
+            continue;
+        }
+        if (inString) {
+            if (c == '\\') {
+                escape = true;
+            } else if (c == '"') {
+                inString = false;
+            }
+            continue;
+        }
+        if (c == '"') {
+            inString = true;
+            continue;
+        }
+
+        // Handle single-line comments
+        if (c == '#' || (c == '/' && i + 1 < code.length() && code[i + 1] == '/')) {
+            while (i < code.length() && code[i] != '\n') {
+                i++;
+            }
+            continue;
+        }
+
+        if (c == '{') braces++;
+        else if (c == '}') braces--;
+        else if (c == '(') parens++;
+        else if (c == ')') parens--;
+        else if (c == '[') brackets++;
+        else if (c == ']') brackets--;
+    }
+
+    return braces <= 0 && parens <= 0 && brackets <= 0 && !inString;
+}
+
+void runREPL() {
+    std::cout << "=================================================\n";
+    std::cout << "  E P I L E P S Y L A N G   C M D   M O D E      \n";
+    std::cout << "  Interactive interpreter for EpilepsyLang.      \n";
+    std::cout << "  Type your code. Press Enter to execute.        \n";
+    std::cout << "  Type \"exit\" to exit, \"help\" for info.          \n";
+    std::cout << "=================================================\n\n";
+
+    Interpreter interpreter;
+    std::string codeBuffer = "";
+
+    while (true) {
+        if (codeBuffer.empty()) {
+            std::cout << "epilepsy > ";
+        } else {
+            std::cout << "...      ";
+        }
+        std::cout.flush();
+
+        std::string line;
+        if (!std::getline(std::cin, line)) {
+            break;
+        }
+
+        if (codeBuffer.empty() && (line == "exit" || line == "quit")) {
+            break;
+        }
+        if (codeBuffer.empty() && line == "help") {
+            std::cout << "Commands and Help:\n";
+            std::cout << "  exit / quit : Close CMD mode\n";
+            std::cout << "  help        : Show this message\n";
+            std::cout << "  Variables   : x = 10\n";
+            std::cout << "  Arrays      : arr = [1, 2, 3]\n";
+            std::cout << "  Built-ins   : print(expr), input(prompt), len(expr), num(expr), str(expr)\n";
+            std::cout << "  Blocks      : {} for scope. Use if, while, for, switch.\n\n";
+            continue;
+        }
+
+        codeBuffer += line + "\n";
+
+        if (isBalanced(codeBuffer)) {
+            try {
+                Lexer lexer(codeBuffer);
+                auto tokens = lexer.scanTokens();
+                Parser parser(tokens);
+                auto statements = parser.parse();
+                interpreter.interpret(statements);
+            } catch (const ParseError& e) {
+                std::cerr << "Syntax Error: " << e.what() << "\n";
+            } catch (const RuntimeError& e) {
+                std::cerr << "Runtime Error (Line " << e.line << "): " << e.what() << "\n";
+            } catch (const std::exception& e) {
+                std::cerr << "Error: " << e.what() << "\n";
+            }
+            codeBuffer = ""; // Reset buffer
+        }
+    }
+}
+
+void runFile(const std::string& path) {
+    std::ifstream file(path);
+    if (!file.is_open()) {
+        std::cerr << "Error: Could not open file '" << path << "'\n";
+        std::exit(1);
+    }
+
+    std::string source((std::istreambuf_iterator<char>(file)),
+                        std::istreambuf_iterator<char>());
+    
+    try {
+        Lexer lexer(source);
+        auto tokens = lexer.scanTokens();
+        Parser parser(tokens);
+        auto statements = parser.parse();
+        Interpreter interpreter;
+        interpreter.interpret(statements);
+    } catch (const ParseError& e) {
+        std::cerr << "Syntax Error: " << e.what() << "\n";
+        std::exit(1);
+    } catch (const RuntimeError& e) {
+        std::cerr << "Runtime Error (Line " << e.line << "): " << e.what() << "\n";
+        std::exit(1);
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << "\n";
+        std::exit(1);
+    }
+}
+
+int main(int argc, char* argv[]) {
+    if (argc > 2) {
+        std::cout << "Usage: EpilespyLang [script.ep]\n";
+        return 1;
+    } else if (argc == 2) {
+        runFile(argv[1]);
+    } else {
+        runREPL();
+    }
+    return 0;
+}

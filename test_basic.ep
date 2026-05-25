@@ -1,0 +1,25 @@
+# Test comments and basic variables
+a = 10
+b = 20
+
+# Test print
+print("a is:", a)
+print("b is:", b)
+
+# Test expressions and operator precedence
+res = a + b * 2 - (5 + 5)
+print("res (expected 40):", res)
+
+# Test strings
+s1 = "hello "
+s2 = "world"
+print("string addition:", s1 + s2)
+
+# Test lexical scoping with block
+{
+    a = 100 # Updates outer 'a'
+    c = 50  # Declared in inner block
+    print("inner a:", a)
+    print("inner c:", c)
+}
+print("outer a after block (expected 100):", a)
