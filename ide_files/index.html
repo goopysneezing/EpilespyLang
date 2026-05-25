@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EpilespyLang IDE</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Outfit:wght@100..900&display=swap" rel="stylesheet">
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Monaco Editor Loader -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.39.0/min/vs/loader.min.js"></script>
+    <script>
+        require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.39.0/min/vs' } });
+    </script>
+    <link rel="stylesheet" href="/ide_files/style.css">
+
+</head>
+<body>
+    <div class="app-container">
+        <!-- 1. Activity Bar (Leftmost Icon Panel) -->
+        <div class="activity-bar">
+            <div class="activity-top">
+                <button class="activity-btn active" data-tab="explorer" title="Explorer">
+                    <i data-lucide="files"></i>
+                </button>
+                <button class="activity-btn" data-tab="search" title="Search in Files">
+                    <i data-lucide="search"></i>
+                </button>
+                <button class="activity-btn" data-tab="compiler" title="Interpreter & Compiler">
+                    <i data-lucide="play-circle"></i>
+                </button>
+            </div>
+            <div class="activity-bottom">
+                <button class="activity-btn" data-tab="settings" title="Settings">
+                    <i data-lucide="settings"></i>
+                </button>
+                <button class="activity-btn" data-tab="help" title="Help & Syntax">
+                    <i data-lucide="help-circle"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- 2. Sidebar Pane -->
+        <div class="sidebar">
+            <!-- Sidebar: Explorer -->
+            <div class="sidebar-tab-content active" id="sidebar-explorer">
+                <div class="sidebar-header">
+                    <h3>EXPLORER</h3>
+                    <div class="sidebar-actions">
+                        <button id="btn-new-file" title="New File"><i data-lucide="file-plus"></i></button>
+                        <button id="btn-new-folder" title="New Folder"><i data-lucide="folder-plus"></i></button>
+                        <button id="btn-refresh" title="Refresh Explorer"><i data-lucide="refresh-cw"></i></button>
+                    </div>
+                </div>
+                <div class="file-explorer-container" id="file-explorer-list">
+                    <!-- File tree will be injected here -->
+                    <div class="loading-spinner-container">
+                        <div class="spinner"></div>
+                        <span>Loading workspace...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar: Search -->
+            <div class="sidebar-tab-content" id="sidebar-search">
+                <div class="sidebar-header">
+                    <h3>SEARCH</h3>
+                </div>
+                <div class="sidebar-search-box">
+                    <div class="search-input-wrapper">
+                        <input type="text" id="search-input" placeholder="Search text in files...">
+                        <button id="btn-run-search" title="Find"><i data-lucide="arrow-right"></i></button>
+                    </div>
+                    <div class="search-results-container" id="search-results-list">
+                        <div class="empty-state">Enter query to search files.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar: Run/Compile -->
+            <div class="sidebar-tab-content" id="sidebar-compiler">
+                <div class="sidebar-header">
+                    <h3>RUN & BUILD</h3>
+                </div>
+                <div class="compiler-control-panel">
+                    <div class="panel-section">
+                        <h4>Interpreter Run</h4>
+                        <p class="section-desc">Executes the current active `.ep` script using the EpilespyLang interpreter.</p>
+                        <button class="primary-btn btn-run" id="btn-run-sidebar">
+                            <i data-lucide="play"></i> Run Current File
+                        </button>
+                    </div>
+                    <div class="panel-section">
+                        <h4>Build Interpreter</h4>
+                        <p class="section-desc">Recompiles `main.cpp` into `EpilespyLang.exe` using MSVC compiler.</p>
+                        <button class="secondary-btn btn-build" id="btn-build-sidebar">
+                            <i data-lucide="cpu"></i> Build C++ Source
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar: Settings -->
+            <div class="sidebar-tab-content" id="sidebar-settings">
+                <div class="sidebar-header">
+                    <h3>SETTINGS</h3>
+                </div>
+                <div class="settings-list">
+                    <div class="setting-item">
+                        <label for="setting-fontsize">Editor Font Size</label>
+                        <select id="setting-fontsize">
+                            <option value="12">12px</option>
+                            <option value="14" selected>14px</option>
+                            <option value="16">16px</option>
+                            <option value="18">18px</option>
+                            <option value="20">20px</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label for="setting-minimap">Minimap</label>
+                        <div class="toggle-switch">
+                            <input type="checkbox" id="setting-minimap" checked>
+                            <span class="slider"></span>
+                        </div>
+                    </div>
+                    <div class="setting-item">
+                        <label for="setting-wordwrap">Word Wrap</label>
+                        <div class="toggle-switch">
+                            <input type="checkbox" id="setting-wordwrap" checked>
+                            <span class="slider"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar: Help -->
+            <div class="sidebar-tab-content" id="sidebar-help">
+                <div class="sidebar-header">
+                    <h3>HELP & SYNTAX</h3>
+                </div>
+                <div class="help-content">
+                    <h4>EpilespyLang Basics</h4>
+                    <p>EpilespyLang is a vibe-coded scripting language. Files should use the <code>.ep</code> extension.</p>
+                    
+                    <h5>Syntax Cheat Sheet</h5>
+                    <pre><code># Variable assignment
+x = 42
+name = "World"
+
+# Printing
+print("Hello", name)
+
+# Scoping block
+{
+    temp = 100
+    print(temp)
+}
+
+# Operations
+res = (x + 10) * 2</code></pre>
+
+                    <h5>Built-in Functions</h5>
+                    <ul>
+                        <li><code>print(...)</code>: Print values</li>
+                        <li><code>input("prompt")</code>: Read user input</li>
+                        <li><code>len(array_or_str)</code>: Get length</li>
+                        <li><code>num(val)</code>: Cast to number</li>
+                        <li><code>str(val)</code>: Cast to string</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Main Workspace Area -->
+        <div class="main-panel">
+            <!-- Tabs Bar -->
+            <div class="tabs-bar">
+                <div class="tabs-scroll-container" id="tabs-container">
+                    <!-- File Tabs dynamically rendered here -->
+                </div>
+                <div class="tabs-controls">
+                    <button class="run-control-btn btn-run" id="btn-run" title="Run Current File (F5)">
+                        <i data-lucide="play"></i>
+                        <span>Run</span>
+                    </button>
+                    <button class="run-control-btn btn-stop" id="btn-stop" title="Stop Script" disabled>
+                        <i data-lucide="square"></i>
+                        <span>Stop</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Code Editor Container -->
+            <div class="editor-container" id="editor-pane">
+                <div class="no-file-open" id="empty-editor-message">
+                    <div class="logo-area">
+                        <i data-lucide="code-2" class="pulse-logo"></i>
+                        <h2>EpilespyLang IDE</h2>
+                        <p>Open a file from the explorer or create a new file to start coding.</p>
+                        <div class="shortcuts-guide">
+                            <div><span>Ctrl + S</span> Save File</div>
+                            <div><span>F5</span> Run Script</div>
+                            <div><span>Ctrl + P</span> Open Search</div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Monaco instance target -->
+                <div id="monaco-editor-instance" style="width: 100%; height: 100%; display: none;"></div>
+            </div>
+
+            <!-- Bottom Console Panel -->
+            <div class="terminal-panel" id="terminal-pane">
+                <div class="terminal-header">
+                    <div class="terminal-tabs">
+                        <button class="terminal-tab-btn active" data-term="console">
+                            <i data-lucide="terminal"></i> Console Output
+                        </button>
+                    </div>
+                    <div class="terminal-actions">
+                        <button id="btn-clear-terminal" title="Clear Console"><i data-lucide="trash-2"></i></button>
+                        <button id="btn-toggle-terminal" title="Collapse Panel"><i data-lucide="chevron-down"></i></button>
+                    </div>
+                </div>
+                <div class="terminal-body" id="terminal-content">
+                    <!-- Console rows dynamically written here -->
+                </div>
+            </div>
+
+            <!-- Status Bar -->
+            <div class="status-bar">
+                <div class="status-left">
+                    <span class="status-indicator-pill ready" id="status-mode">
+                        <span class="pulse-dot"></span> <span id="status-mode-text">Ready</span>
+                    </span>
+                    <span class="status-item" id="status-filename">No File Open</span>
+                </div>
+                <div class="status-right">
+                    <span class="status-item" id="status-cursor">Line 0, Col 0</span>
+                    <span class="status-item">UTF-8</span>
+                    <span class="status-item" id="status-lang">EpilespyLang</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <!-- Modal: File Prompt -->
+    <div class="modal-overlay" id="modal-file-prompt">
+        <div class="modal-card">
+            <h3 id="modal-prompt-title">Create New File</h3>
+            <div class="modal-body">
+                <label for="modal-input-name" id="modal-prompt-label">Enter name:</label>
+                <input type="text" id="modal-input-name" placeholder="script.ep">
+                <p class="modal-error-message" id="modal-error-text"></p>
+            </div>
+            <div class="modal-actions">
+                <button class="flat-btn" id="modal-btn-cancel">Cancel</button>
+                <button class="primary-btn" id="modal-btn-submit">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Confirmation -->
+    <div class="modal-overlay" id="modal-confirm">
+        <div class="modal-card warning-card">
+            <h3 id="modal-confirm-title">Delete File</h3>
+            <div class="modal-body">
+                <p id="modal-confirm-text">Are you sure you want to delete this file? This action cannot be undone.</p>
+            </div>
+            <div class="modal-actions">
+                <button class="flat-btn" id="modal-confirm-cancel">Cancel</button>
+                <button class="danger-btn" id="modal-confirm-submit">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Main Logic Bundle -->
+    <script src="/ide_files/app.js"></script>
+</body>
+</html>
