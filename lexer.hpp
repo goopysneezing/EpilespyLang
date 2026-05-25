@@ -229,9 +229,9 @@ public:
             scanToken();
         }
 
-        // If the last token was a newline, let's remove it and place EOF
-        if (!tokens.empty() && tokens.back().type == TokenType::NEWLINE) {
-            tokens.pop_back();
+        // Ensure there is a NEWLINE token before EOF so the end of code acts as a newline
+        if (tokens.empty() || tokens.back().type != TokenType::NEWLINE) {
+            tokens.push_back({TokenType::NEWLINE, "\n", Value(), line});
         }
 
         tokens.push_back({TokenType::EOF_VAL, "", Value(), line});
