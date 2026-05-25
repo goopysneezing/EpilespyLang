@@ -1,0 +1,40 @@
+# Test math constants
+print("pi is:", pi)
+print("e is:", e)
+
+# Test basic trig functions
+print("sin(pi/2):", sin(pi/2))
+print("cos(pi):", cos(pi))
+print("tan(pi/4):", tan(pi/4))
+
+# Test inverse trig functions
+print("asin(1):", asin(1))
+print("acos(-1):", acos(-1))
+print("atan(1):", atan(1))
+print("atan2(1, 1):", atan2(1, 1))
+
+# Test hyperbolic functions
+print("sinh(1):", sinh(1))
+print("cosh(1):", cosh(1))
+print("tanh(1):", tanh(1))
+
+# Test power, log, exponential
+print("sqrt(16):", sqrt(16))
+print("cbrt(27):", cbrt(27))
+print("pow(2, 10):", pow(2, 10))
+print("exp(1):", exp(1))
+print("log(e):", log(e))
+print("log10(100):", log10(100))
+print("log2(8):", log2(8))
+
+# Test rounding, abs, min, max
+print("abs(-4.5):", abs(-4.5))
+print("ceil(4.1):", ceil(4.1))
+print("floor(4.9):", floor(4.9))
+print("round(4.5):", round(4.5))
+print("min(10, 20):", min(10, 20))
+print("max(10, 20):", max(10, 20))
+
+# Test conversions
+print("deg2rad(180):", deg2rad(180))
+print("rad2deg(pi):", rad2deg(pi))

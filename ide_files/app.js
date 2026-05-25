@@ -62,7 +62,7 @@ function initMonaco() {
                         [/\b(if|else|while|for|switch|exit|quit|help)\b/, 'keyword'],
                         
                         // Built-in functions
-                        [/\b(print|input|len|num|str)\b/, 'keyword.function'],
+                        [/\b(print|input|len|num|str|push|pop|type|window|sleep|sin|cos|tan|asin|acos|atan|atan2|sinh|cosh|tanh|sqrt|cbrt|pow|exp|log|log10|log2|abs|ceil|floor|round|min|max|deg2rad|rad2deg)\b/, 'keyword.function'],
                         
                         // Numbers
                         [/\b\d+(\.\d+)?\b/, 'number'],

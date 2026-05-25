@@ -20,7 +20,10 @@ private:
     }
 
 public:
-    Interpreter() = default;
+    Interpreter() {
+        environment->define("pi", Value(3.14159265358979323846));
+        environment->define("e", Value(2.71828182845904523536));
+    }
 
     std::shared_ptr<Environment> getGlobals() const {
         return environment;
@@ -299,6 +302,143 @@ public:
             double ms = args[0].asNumber();
             std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<long long>(ms)));
             return Value();
+        }
+
+        // Mathematical Built-in Functions
+        auto checkNumArgs = [&](const std::string& name, size_t expectedCount) {
+            if (args.size() != expectedCount) {
+                throw RuntimeError(expr->callee.line, name + "() expects exactly " + std::to_string(expectedCount) + " argument(s).");
+            }
+            for (size_t i = 0; i < expectedCount; ++i) {
+                if (!args[i].isNumber()) {
+                    throw RuntimeError(expr->callee.line, "Argument " + std::to_string(i + 1) + " of " + name + "() must be a number.");
+                }
+            }
+        };
+
+        if (calleeName == "sin") {
+            checkNumArgs("sin", 1);
+            return Value(std::sin(args[0].asNumber()));
+        }
+        if (calleeName == "cos") {
+            checkNumArgs("cos", 1);
+            return Value(std::cos(args[0].asNumber()));
+        }
+        if (calleeName == "tan") {
+            checkNumArgs("tan", 1);
+            return Value(std::tan(args[0].asNumber()));
+        }
+        if (calleeName == "asin") {
+            checkNumArgs("asin", 1);
+            double val = args[0].asNumber();
+            if (val < -1.0 || val > 1.0) {
+                throw RuntimeError(expr->callee.line, "asin() argument must be between -1.0 and 1.0.");
+            }
+            return Value(std::asin(val));
+        }
+        if (calleeName == "acos") {
+            checkNumArgs("acos", 1);
+            double val = args[0].asNumber();
+            if (val < -1.0 || val > 1.0) {
+                throw RuntimeError(expr->callee.line, "acos() argument must be between -1.0 and 1.0.");
+            }
+            return Value(std::acos(val));
+        }
+        if (calleeName == "atan") {
+            checkNumArgs("atan", 1);
+            return Value(std::atan(args[0].asNumber()));
+        }
+        if (calleeName == "atan2") {
+            checkNumArgs("atan2", 2);
+            return Value(std::atan2(args[0].asNumber(), args[1].asNumber()));
+        }
+        if (calleeName == "sinh") {
+            checkNumArgs("sinh", 1);
+            return Value(std::sinh(args[0].asNumber()));
+        }
+        if (calleeName == "cosh") {
+            checkNumArgs("cosh", 1);
+            return Value(std::cosh(args[0].asNumber()));
+        }
+        if (calleeName == "tanh") {
+            checkNumArgs("tanh", 1);
+            return Value(std::tanh(args[0].asNumber()));
+        }
+        if (calleeName == "sqrt") {
+            checkNumArgs("sqrt", 1);
+            double val = args[0].asNumber();
+            if (val < 0.0) {
+                throw RuntimeError(expr->callee.line, "sqrt() argument must be non-negative.");
+            }
+            return Value(std::sqrt(val));
+        }
+        if (calleeName == "cbrt") {
+            checkNumArgs("cbrt", 1);
+            return Value(std::cbrt(args[0].asNumber()));
+        }
+        if (calleeName == "pow") {
+            checkNumArgs("pow", 2);
+            return Value(std::pow(args[0].asNumber(), args[1].asNumber()));
+        }
+        if (calleeName == "exp") {
+            checkNumArgs("exp", 1);
+            return Value(std::exp(args[0].asNumber()));
+        }
+        if (calleeName == "log") {
+            checkNumArgs("log", 1);
+            double val = args[0].asNumber();
+            if (val <= 0.0) {
+                throw RuntimeError(expr->callee.line, "log() argument must be positive.");
+            }
+            return Value(std::log(val));
+        }
+        if (calleeName == "log10") {
+            checkNumArgs("log10", 1);
+            double val = args[0].asNumber();
+            if (val <= 0.0) {
+                throw RuntimeError(expr->callee.line, "log10() argument must be positive.");
+            }
+            return Value(std::log10(val));
+        }
+        if (calleeName == "log2") {
+            checkNumArgs("log2", 1);
+            double val = args[0].asNumber();
+            if (val <= 0.0) {
+                throw RuntimeError(expr->callee.line, "log2() argument must be positive.");
+            }
+            return Value(std::log2(val));
+        }
+        if (calleeName == "abs") {
+            checkNumArgs("abs", 1);
+            return Value(std::abs(args[0].asNumber()));
+        }
+        if (calleeName == "ceil") {
+            checkNumArgs("ceil", 1);
+            return Value(std::ceil(args[0].asNumber()));
+        }
+        if (calleeName == "floor") {
+            checkNumArgs("floor", 1);
+            return Value(std::floor(args[0].asNumber()));
+        }
+        if (calleeName == "round") {
+            checkNumArgs("round", 1);
+            return Value(std::round(args[0].asNumber()));
+        }
+        if (calleeName == "min") {
+            checkNumArgs("min", 2);
+            return Value(std::min(args[0].asNumber(), args[1].asNumber()));
+        }
+        if (calleeName == "max") {
+            checkNumArgs("max", 2);
+            return Value(std::max(args[0].asNumber(), args[1].asNumber()));
+        }
+        if (calleeName == "deg2rad") {
+            checkNumArgs("deg2rad", 1);
+            return Value(args[0].asNumber() * 3.14159265358979323846 / 180.0);
+        }
+        if (calleeName == "rad2deg") {
+            checkNumArgs("rad2deg", 1);
+            return Value(args[0].asNumber() * 180.0 / 3.14159265358979323846);
         }
 
         throw RuntimeError(expr->callee.line, "Undefined function '" + calleeName + "'.");
