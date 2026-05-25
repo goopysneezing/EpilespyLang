@@ -4,6 +4,7 @@
 #include <vector>
 #include <exception>
 #include <cstdlib>
+#define NOMINMAX
 #include <windows.h>
 #include <filesystem>
 #include "value.hpp"
