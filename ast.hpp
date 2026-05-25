@@ -4,12 +4,22 @@
 #include <memory>
 #include "value.hpp"
 
+#ifdef TRUE
+#undef TRUE
+#endif
+#ifdef FALSE
+#undef FALSE
+#endif
+
+// Redirect TokenType to EpTokenType to avoid collisions with Windows SDK
+#define TokenType EpTokenType
+
 // Token types for EpilespyLang
 enum class TokenType {
     // Single-character tokens
     LEFT_PAREN, RIGHT_PAREN, LEFT_BRACE, RIGHT_BRACE,
     LEFT_BRACKET, RIGHT_BRACKET,
-    COMMA, MINUS, PLUS, SLASH, STAR, PERCENT, COLON, SEMICOLON,
+    COMMA, DOT, MINUS, PLUS, SLASH, STAR, PERCENT, COLON, SEMICOLON,
     
     // One or two character tokens
     BANG, BANG_EQUAL,
@@ -38,6 +48,7 @@ inline std::string tokenTypeToString(TokenType type) {
         case TokenType::LEFT_BRACKET: return "[";
         case TokenType::RIGHT_BRACKET: return "]";
         case TokenType::COMMA: return ",";
+        case TokenType::DOT: return ".";
         case TokenType::MINUS: return "-";
         case TokenType::PLUS: return "+";
         case TokenType::SLASH: return "/";
@@ -92,6 +103,7 @@ class CallExpr;
 class ArrayExpr;
 class IndexExpr;
 class IndexAssignmentExpr;
+class MethodCallExpr;
 
 class ExprVisitor {
 public:
@@ -105,6 +117,7 @@ public:
     virtual Value visitArrayExpr(ArrayExpr* expr) = 0;
     virtual Value visitIndexExpr(IndexExpr* expr) = 0;
     virtual Value visitIndexAssignmentExpr(IndexAssignmentExpr* expr) = 0;
+    virtual Value visitMethodCallExpr(MethodCallExpr* expr) = 0;
 };
 
 class Expr {
@@ -188,6 +201,16 @@ public:
     IndexAssignmentExpr(ExprPtr array, Token bracket, ExprPtr index, ExprPtr value)
         : array(array), bracket(bracket), index(index), value(value) {}
     Value accept(ExprVisitor* visitor) override { return visitor->visitIndexAssignmentExpr(this); }
+};
+
+class MethodCallExpr : public Expr {
+public:
+    ExprPtr object;
+    Token method;
+    std::vector<ExprPtr> arguments;
+    MethodCallExpr(ExprPtr object, Token method, std::vector<ExprPtr> arguments)
+        : object(object), method(method), arguments(arguments) {}
+    Value accept(ExprVisitor* visitor) override { return visitor->visitMethodCallExpr(this); }
 };
 
 // Forward declaration of statements

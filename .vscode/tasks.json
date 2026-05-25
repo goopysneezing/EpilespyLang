@@ -10,7 +10,9 @@
                 "/std:c++17",
                 "/nologo",
                 "/Fe${workspaceFolder}\\EpilespyLang.exe",
-                "${workspaceFolder}\\main.cpp"
+                "${workspaceFolder}\\main.cpp",
+                "gdi32.lib",
+                "user32.lib"
             ],
             "options": {
                 "cwd": "${workspaceFolder}"

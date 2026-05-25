@@ -203,6 +203,19 @@ private:
                 ExprPtr index = expression();
                 consume(TokenType::RIGHT_BRACKET, "Expect ']' after index.");
                 expr = std::make_shared<IndexExpr>(expr, bracket, index);
+            } else if (match(TokenType::DOT)) {
+                Token name = consume(TokenType::IDENTIFIER, "Expect method name after '.'.");
+                consume(TokenType::LEFT_PAREN, "Expect '(' after method name.");
+                std::vector<ExprPtr> arguments;
+                if (!check(TokenType::RIGHT_PAREN)) {
+                    do {
+                        skipNewlines();
+                        arguments.push_back(expression());
+                        skipNewlines();
+                    } while (match(TokenType::COMMA));
+                }
+                consume(TokenType::RIGHT_PAREN, "Expect ')' after method arguments.");
+                expr = std::make_shared<MethodCallExpr>(expr, name, arguments);
             } else {
                 break;
             }

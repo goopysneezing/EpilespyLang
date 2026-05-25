@@ -7,10 +7,12 @@
 #include <iomanip>
 #include <cmath>
 #include <stdexcept>
+#include "window.hpp"
 
 // Forward declarations
 struct Value;
 using ValueArray = std::shared_ptr<std::vector<Value>>;
+using WindowPtr = std::shared_ptr<WindowInstance>;
 
 class RuntimeError : public std::runtime_error {
 public:
@@ -26,7 +28,7 @@ struct Nil {
 
 class Value {
 public:
-    std::variant<Nil, bool, double, std::string, ValueArray> asVariant;
+    std::variant<Nil, bool, double, std::string, ValueArray, WindowPtr> asVariant;
 
     Value() : asVariant(Nil{}) {}
     Value(Nil) : asVariant(Nil{}) {}
@@ -35,17 +37,20 @@ public:
     Value(const std::string& s) : asVariant(s) {}
     Value(const char* s) : asVariant(std::string(s)) {}
     Value(ValueArray arr) : asVariant(arr) {}
+    Value(WindowPtr win) : asVariant(win) {}
 
     bool isNil() const { return std::holds_alternative<Nil>(asVariant); }
     bool isBool() const { return std::holds_alternative<bool>(asVariant); }
     bool isNumber() const { return std::holds_alternative<double>(asVariant); }
     bool isString() const { return std::holds_alternative<std::string>(asVariant); }
     bool isArray() const { return std::holds_alternative<ValueArray>(asVariant); }
+    bool isWindow() const { return std::holds_alternative<WindowPtr>(asVariant); }
 
     bool asBool() const { return std::get<bool>(asVariant); }
     double asNumber() const { return std::get<double>(asVariant); }
     const std::string& asString() const { return std::get<std::string>(asVariant); }
     ValueArray asArray() const { return std::get<ValueArray>(asVariant); }
+    WindowPtr asWindow() const { return std::get<WindowPtr>(asVariant); }
 
     bool isTruthy() const {
         if (isNil()) return false;
@@ -53,6 +58,7 @@ public:
         if (isNumber()) return asNumber() != 0.0;
         if (isString()) return !asString().empty();
         if (isArray()) return !asArray()->empty();
+        if (isWindow()) return true;
         return true;
     }
 
@@ -69,6 +75,7 @@ public:
             return ss.str();
         }
         if (isString()) return asString();
+        if (isWindow()) return "<window>";
         if (isArray()) {
             std::string res = "[";
             auto arr = asArray();
@@ -92,6 +99,7 @@ public:
         if (isNumber()) return "number";
         if (isString()) return "string";
         if (isArray()) return "array";
+        if (isWindow()) return "window";
         return "unknown";
     }
 };
@@ -102,6 +110,7 @@ inline bool valuesEqual(const Value& a, const Value& b) {
     if (a.isBool()) return a.asBool() == b.asBool();
     if (a.isNumber()) return a.asNumber() == b.asNumber();
     if (a.isString()) return a.asString() == b.asString();
+    if (a.isWindow()) return a.asWindow() == b.asWindow();
     if (a.isArray()) {
         auto arrA = a.asArray();
         auto arrB = b.asArray();

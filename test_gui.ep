@@ -1,0 +1,55 @@
+# EpilespyLang GUI & Input Demo
+win = window("Interactive Canvas", 800, 600)
+
+x = 400
+y = 300
+r = 20
+speed = 5
+
+while (win.isOpen()) {
+    # Clear screen with black background
+    win.clear("black")
+
+    # Get keyboard input to move the red ball
+    if (win.getKey("left")) {
+        x = x - speed
+    }
+    if (win.getKey("right")) {
+        x = x + speed
+    }
+    if (win.getKey("up")) {
+        y = y - speed
+    }
+    if (win.getKey("down")) {
+        y = y + speed
+    }
+
+    # Draw arena borders
+    win.rectEmpty(10, 10, 780, 580, "white", 2)
+
+    # Draw background static shapes (to demonstrate GDI drawing commands)
+    win.rect(100, 100, 150, 80, "blue")
+    win.rectEmpty(100, 220, 150, 80, "green", 3)
+    win.ellipse(600, 150, 80, 45, "purple")
+    win.line(50, 500, 750, 500, "gray", 1)
+
+    # Draw player ball
+    win.circle(x, y, r, "red")
+
+    # Draw text guide
+    win.text(200, 30, "Use Arrow Keys to Move the Red Ball!", "yellow", 24)
+
+    # Draw mouse follower (cursor canvas feedback)
+    mx = win.getMouseX()
+    my = win.getMouseY()
+    win.circleEmpty(mx, my, 15, "cyan", 2)
+
+    # Draw click indicator if mouse is held down
+    if (win.getMouseLeft()) {
+        win.text(mx + 20, my - 10, "Click!", "magenta", 16)
+        win.pixel(mx, my, "red")
+    }
+
+    # Yield processing time (limits to ~60 FPS)
+    sleep(16)
+}

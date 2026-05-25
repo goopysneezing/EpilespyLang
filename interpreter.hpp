@@ -4,6 +4,8 @@
 #include <memory>
 #include <string>
 #include <cmath>
+#include <thread>
+#include <chrono>
 #include "ast.hpp"
 #include "value.hpp"
 #include "environment.hpp"
@@ -272,6 +274,33 @@ public:
             return Value(args[0].typeString());
         }
 
+        if (calleeName == "window") {
+            if (args.size() != 3) {
+                throw RuntimeError(expr->callee.line, "window() expects exactly 3 arguments (title, width, height).");
+            }
+            if (!args[0].isString() || !args[1].isNumber() || !args[2].isNumber()) {
+                throw RuntimeError(expr->callee.line, "window() arguments must be (string, number, number).");
+            }
+            std::string title = args[0].asString();
+            int w = static_cast<int>(args[1].asNumber());
+            int h = static_cast<int>(args[2].asNumber());
+            
+            auto win = std::make_shared<WindowInstance>(title, w, h);
+            return Value(win);
+        }
+
+        if (calleeName == "sleep") {
+            if (args.size() != 1) {
+                throw RuntimeError(expr->callee.line, "sleep() expects exactly 1 argument (milliseconds).");
+            }
+            if (!args[0].isNumber()) {
+                throw RuntimeError(expr->callee.line, "sleep() argument must be a number.");
+            }
+            double ms = args[0].asNumber();
+            std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<long long>(ms)));
+            return Value();
+        }
+
         throw RuntimeError(expr->callee.line, "Undefined function '" + calleeName + "'.");
     }
 
@@ -339,6 +368,144 @@ public:
 
         (*arr)[idx] = newVal;
         return newVal;
+    }
+
+    Value visitMethodCallExpr(MethodCallExpr* expr) override {
+        Value obj = evaluate(expr->object);
+        if (!obj.isWindow()) {
+            throw RuntimeError(expr->method.line, "Only window objects support method calls.");
+        }
+        auto win = obj.asWindow();
+        std::string methodName = expr->method.lexeme;
+        
+        std::vector<Value> args;
+        for (auto& argExpr : expr->arguments) {
+            args.push_back(evaluate(argExpr));
+        }
+
+        if (methodName == "clear") {
+            if (args.size() != 1) throw RuntimeError(expr->method.line, "clear() expects exactly 1 argument (color).");
+            if (!args[0].isString()) throw RuntimeError(expr->method.line, "clear() argument must be a string color.");
+            win->clear(args[0].asString());
+            return obj;
+        }
+        
+        if (methodName == "rect") {
+            if (args.size() != 5) throw RuntimeError(expr->method.line, "rect() expects exactly 5 arguments (x, y, w, h, color).");
+            if (!args[0].isNumber() || !args[1].isNumber() || !args[2].isNumber() || !args[3].isNumber() || !args[4].isString()) {
+                throw RuntimeError(expr->method.line, "rect() expects (number, number, number, number, string).");
+            }
+            win->rect(static_cast<int>(args[0].asNumber()), static_cast<int>(args[1].asNumber()),
+                      static_cast<int>(args[2].asNumber()), static_cast<int>(args[3].asNumber()),
+                      args[4].asString());
+            return obj;
+        }
+
+        if (methodName == "rectEmpty") {
+            if (args.size() != 6) throw RuntimeError(expr->method.line, "rectEmpty() expects exactly 6 arguments (x, y, w, h, color, thickness).");
+            if (!args[0].isNumber() || !args[1].isNumber() || !args[2].isNumber() || !args[3].isNumber() || !args[4].isString() || !args[5].isNumber()) {
+                throw RuntimeError(expr->method.line, "rectEmpty() expects (number, number, number, number, string, number).");
+            }
+            win->rectEmpty(static_cast<int>(args[0].asNumber()), static_cast<int>(args[1].asNumber()),
+                           static_cast<int>(args[2].asNumber()), static_cast<int>(args[3].asNumber()),
+                           args[4].asString(), static_cast<int>(args[5].asNumber()));
+            return obj;
+        }
+
+        if (methodName == "circle") {
+            if (args.size() != 4) throw RuntimeError(expr->method.line, "circle() expects exactly 4 arguments (x, y, r, color).");
+            if (!args[0].isNumber() || !args[1].isNumber() || !args[2].isNumber() || !args[3].isString()) {
+                throw RuntimeError(expr->method.line, "circle() expects (number, number, number, string).");
+            }
+            win->circle(static_cast<int>(args[0].asNumber()), static_cast<int>(args[1].asNumber()),
+                        static_cast<int>(args[2].asNumber()), args[3].asString());
+            return obj;
+        }
+
+        if (methodName == "circleEmpty") {
+            if (args.size() != 5) throw RuntimeError(expr->method.line, "circleEmpty() expects exactly 5 arguments (x, y, r, color, thickness).");
+            if (!args[0].isNumber() || !args[1].isNumber() || !args[2].isNumber() || !args[3].isString() || !args[4].isNumber()) {
+                throw RuntimeError(expr->method.line, "circleEmpty() expects (number, number, number, string, number).");
+            }
+            win->circleEmpty(static_cast<int>(args[0].asNumber()), static_cast<int>(args[1].asNumber()),
+                             static_cast<int>(args[2].asNumber()), args[3].asString(), static_cast<int>(args[4].asNumber()));
+            return obj;
+        }
+
+        if (methodName == "ellipse") {
+            if (args.size() != 5) throw RuntimeError(expr->method.line, "ellipse() expects exactly 5 arguments (x, y, rx, ry, color).");
+            if (!args[0].isNumber() || !args[1].isNumber() || !args[2].isNumber() || !args[3].isNumber() || !args[4].isString()) {
+                throw RuntimeError(expr->method.line, "ellipse() expects (number, number, number, number, string).");
+            }
+            win->ellipse(static_cast<int>(args[0].asNumber()), static_cast<int>(args[1].asNumber()),
+                         static_cast<int>(args[2].asNumber()), static_cast<int>(args[3].asNumber()),
+                         args[4].asString());
+            return obj;
+        }
+
+        if (methodName == "line") {
+            if (args.size() != 6) throw RuntimeError(expr->method.line, "line() expects exactly 6 arguments (x1, y1, x2, y2, color, thickness).");
+            if (!args[0].isNumber() || !args[1].isNumber() || !args[2].isNumber() || !args[3].isNumber() || !args[4].isString() || !args[5].isNumber()) {
+                throw RuntimeError(expr->method.line, "line() expects (number, number, number, number, string, number).");
+            }
+            win->line(static_cast<int>(args[0].asNumber()), static_cast<int>(args[1].asNumber()),
+                      static_cast<int>(args[2].asNumber()), static_cast<int>(args[3].asNumber()),
+                      args[4].asString(), static_cast<int>(args[5].asNumber()));
+            return obj;
+        }
+
+        if (methodName == "text") {
+            if (args.size() != 5) throw RuntimeError(expr->method.line, "text() expects exactly 5 arguments (x, y, text, color, size).");
+            if (!args[0].isNumber() || !args[1].isNumber() || !args[2].isString() || !args[3].isString() || !args[4].isNumber()) {
+                throw RuntimeError(expr->method.line, "text() expects (number, number, string, string, number).");
+            }
+            win->text(static_cast<int>(args[0].asNumber()), static_cast<int>(args[1].asNumber()),
+                      args[2].asString(), args[3].asString(), static_cast<int>(args[4].asNumber()));
+            return obj;
+        }
+
+        if (methodName == "pixel") {
+            if (args.size() != 3) throw RuntimeError(expr->method.line, "pixel() expects exactly 3 arguments (x, y, color).");
+            if (!args[0].isNumber() || !args[1].isNumber() || !args[2].isString()) {
+                throw RuntimeError(expr->method.line, "pixel() expects (number, number, string).");
+            }
+            win->pixel(static_cast<int>(args[0].asNumber()), static_cast<int>(args[1].asNumber()), args[2].asString());
+            return obj;
+        }
+
+        if (methodName == "isOpen") {
+            if (args.size() != 0) throw RuntimeError(expr->method.line, "isOpen() expects 0 arguments.");
+            return win->isOpen();
+        }
+
+        if (methodName == "getKey") {
+            if (args.size() != 1) throw RuntimeError(expr->method.line, "getKey() expects exactly 1 argument (keyName).");
+            if (!args[0].isString()) throw RuntimeError(expr->method.line, "getKey() argument must be a string.");
+            return win->getKey(args[0].asString());
+        }
+
+        if (methodName == "getMouseX") {
+            if (args.size() != 0) throw RuntimeError(expr->method.line, "getMouseX() expects 0 arguments.");
+            return win->getMouseX();
+        }
+
+        if (methodName == "getMouseY") {
+            if (args.size() != 0) throw RuntimeError(expr->method.line, "getMouseY() expects 0 arguments.");
+            return win->getMouseY();
+        }
+
+        if (methodName == "getMouseLeft") {
+            if (args.size() != 0) throw RuntimeError(expr->method.line, "getMouseLeft() expects 0 arguments.");
+            return win->getMouseLeft();
+        }
+
+        if (methodName == "close") {
+            if (args.size() != 0) throw RuntimeError(expr->method.line, "close() expects 0 arguments.");
+            win->close();
+            return obj;
+        }
+
+        throw RuntimeError(expr->method.line, "Unknown method '" + methodName + "' on window object.");
     }
 
     // StmtVisitor implementation
