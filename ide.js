@@ -5,8 +5,8 @@ const { spawn, exec } = require('child_process');
 const { URL } = require('url');
 
 const PORT = 8000;
-const WORKSPACE_DIR = __dirname;
-const STATIC_DIR = path.join(WORKSPACE_DIR, 'ide_files');
+const WORKSPACE_DIR = process.argv[2] ? path.resolve(process.argv[2]) : process.cwd();
+const STATIC_DIR = path.join(__dirname, 'ide_files');
 
 let activeProcess = null;
 
@@ -186,7 +186,7 @@ const server = http.createServer(async (req, res) => {
                 return;
             }
 
-            const interpreterExe = path.join(WORKSPACE_DIR, 'EpilespyLang.exe');
+            const interpreterExe = path.join(__dirname, 'EpilespyLang.exe');
 
             res.writeHead(200, {
                 'Content-Type': 'text/event-stream',
@@ -258,7 +258,7 @@ const server = http.createServer(async (req, res) => {
             const compileCmd = 'cl.exe';
             const compileArgs = ['/Zi', '/EHsc', '/std:c++17', '/nologo', '/FeEpilespyLang.exe', 'main.cpp'];
 
-            const compileProcess = spawn(compileCmd, compileArgs, { cwd: WORKSPACE_DIR });
+            const compileProcess = spawn(compileCmd, compileArgs, { cwd: __dirname });
 
             compileProcess.stdout.on('data', (data) => {
                 sendSSE('stdout', data.toString());
@@ -450,11 +450,20 @@ const server = http.createServer(async (req, res) => {
         // --- STATIC FILE SERVING ---
         else {
             let cleanPath = pathname.replace(/^\//, '');
-            let staticFile;
+            if (cleanPath === '') {
+                cleanPath = 'index.html';
+            }
 
-            if (cleanPath === '' || cleanPath === 'index.html') {
-                staticFile = path.join(STATIC_DIR, 'index.html');
-            } else {
+            let staticFile = path.join(STATIC_DIR, cleanPath);
+            try {
+                // Try finding it in the ide_files static directory first (for style.css, app.js, etc.)
+                await fs.access(staticFile);
+                const stat = await fs.stat(staticFile);
+                if (stat.isDirectory()) {
+                    throw new Error('Is directory');
+                }
+            } catch (err) {
+                // Fallback to the main workspace directory
                 staticFile = path.join(WORKSPACE_DIR, cleanPath);
             }
 
