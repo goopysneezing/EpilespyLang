@@ -9,6 +9,51 @@
 #include "ast.hpp"
 #include "value.hpp"
 #include "environment.hpp"
+#include <wininet.h>
+#include <fstream>
+#include <sstream>
+
+inline std::string fetchURL(const std::string& url) {
+    HINTERNET hInternet = InternetOpenA("EpilespyLangUserAgent", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
+    if (!hInternet) {
+        throw std::runtime_error("Failed to initialize internet connection.");
+    }
+
+    HINTERNET hConnect = InternetOpenUrlA(hInternet, url.c_str(), NULL, 0, INTERNET_FLAG_RELOAD, 0);
+    if (!hConnect) {
+        InternetCloseHandle(hInternet);
+        throw std::runtime_error("Failed to open URL: " + url);
+    }
+
+    std::string result = "";
+    char buffer[4096];
+    DWORD bytesRead = 0;
+    while (InternetReadFile(hConnect, buffer, sizeof(buffer), &bytesRead) && bytesRead > 0) {
+        result.append(buffer, bytesRead);
+    }
+
+    InternetCloseHandle(hConnect);
+    InternetCloseHandle(hInternet);
+    return result;
+}
+
+inline std::string fetchLocalFile(const std::string& path) {
+    std::string cleanPath = path;
+    if (cleanPath.rfind("file://", 0) == 0) {
+        cleanPath = cleanPath.substr(7);
+        // On Windows, file:///C:/path might have a leading slash
+        if (cleanPath.length() >= 3 && cleanPath[0] == '/' && cleanPath[2] == ':') {
+            cleanPath = cleanPath.substr(1);
+        }
+    }
+    std::ifstream file(cleanPath, std::ios::binary);
+    if (!file.is_open()) {
+        throw std::runtime_error("Failed to open local file: " + cleanPath);
+    }
+    std::stringstream ss;
+    ss << file.rdbuf();
+    return ss.str();
+}
 
 class Interpreter : public ExprVisitor, public StmtVisitor {
 private:
@@ -447,6 +492,24 @@ public:
             }
             epilepsyState = !epilepsyState;
             return Value(epilepsyState ? 1.0 : 0.0);
+        }
+        if (calleeName == "fetch") {
+            if (args.size() != 1) {
+                throw RuntimeError(expr->callee.line, "fetch() expects exactly 1 argument (URI).");
+            }
+            if (!args[0].isString()) {
+                throw RuntimeError(expr->callee.line, "fetch() argument must be a string.");
+            }
+            std::string uri = args[0].asString();
+            try {
+                if (uri.rfind("http://", 0) == 0 || uri.rfind("https://", 0) == 0) {
+                    return Value(fetchURL(uri));
+                } else {
+                    return Value(fetchLocalFile(uri));
+                }
+            } catch (const std::exception& e) {
+                throw RuntimeError(expr->callee.line, e.what());
+            }
         }
 
         throw RuntimeError(expr->callee.line, "Undefined function '" + calleeName + "'.");
