@@ -3,7 +3,86 @@
 #include <vector>
 #include <unordered_map>
 #include <stdexcept>
+#include <algorithm>
+#include <utility>
+#include <iostream>
 #include "ast.hpp"
+
+// Helper functions for spelling and casing auto-correction
+inline int getEditDistance(const std::string& s1, const std::string& s2) {
+    int m = static_cast<int>(s1.length());
+    int n = static_cast<int>(s2.length());
+    std::vector<std::vector<int>> dp(m + 1, std::vector<int>(n + 1, 0));
+
+    for (int i = 0; i <= m; i++) dp[i][0] = i;
+    for (int j = 0; j <= n; j++) dp[0][j] = j;
+
+    for (int i = 1; i <= m; i++) {
+        for (int j = 1; j <= n; j++) {
+            int cost = (s1[i - 1] == s2[j - 1]) ? 0 : 1;
+            dp[i][j] = (std::min)({dp[i - 1][j] + 1,      // Deletion
+                                  dp[i][j - 1] + 1,      // Insertion
+                                  dp[i - 1][j - 1] + cost}); // Substitution
+
+            // Check for transposition (Damerau-Levenshtein)
+            if (i > 1 && j > 1 && s1[i - 1] == s2[j - 2] && s1[i - 2] == s2[j - 1]) {
+                dp[i][j] = (std::min)(dp[i][j], dp[i - 2][j - 2] + 1);
+            }
+        }
+    }
+    return dp[m][n];
+}
+
+inline std::string getCorrectedKeyword(const std::string& original_id) {
+    std::string id = original_id;
+    for (char &c : id) c = tolower(c);
+
+    // 1. Case-insensitive exact matches
+    if (id == "if") return "if";
+    if (id == "else") return "else";
+    if (id == "while") return "while";
+    if (id == "for") return "for";
+    if (id == "switch") return "switch";
+    if (id == "case") return "case";
+    if (id == "default") return "default";
+    if (id == "true") return "true";
+    if (id == "false") return "false";
+    if (id == "null") return "null";
+    if (id == "and") return "and";
+    if (id == "or") return "or";
+    if (id == "not") return "not";
+
+    // 2. Strict matching rules for short keywords to prevent false positives
+    if (id == "iff" || id == "iif" || id == "fi") return "if";
+    if (id == "fro" || id == "fo" || id == "forr" || id == "fpr") return "for";
+    if (id == "an" || id == "nd") return "and";
+    if (id == "ot" || id == "nt") return "not";
+
+    // 3. Edit distance for longer keywords (length >= 4)
+    std::vector<std::pair<std::string, std::string>> longerKeywords = {
+        {"else", "else"},
+        {"while", "while"},
+        {"switch", "switch"},
+        {"case", "case"},
+        {"default", "default"},
+        {"true", "true"},
+        {"false", "false"},
+        {"null", "null"}
+    };
+
+    // Specific typo rules for true/false to be even more robust
+    if (id == "ture") return "true";
+    if (id == "flase") return "false";
+
+    for (const auto& kw : longerKeywords) {
+        if (getEditDistance(id, kw.first) <= 1) {
+            return kw.second;
+        }
+    }
+
+    return "";
+}
+
 
 class Lexer {
 private:
@@ -40,12 +119,12 @@ private:
         return true;
     }
 
-    void addToken(TokenType type) {
-        addToken(type, Value());
+    void addToken(TokenType type, const std::string& customText = "") {
+        addToken(type, Value(), customText);
     }
 
-    void addToken(TokenType type, Value literal) {
-        std::string text = source.substr(start, current - start);
+    void addToken(TokenType type, Value literal, const std::string& customText = "") {
+        std::string text = customText.empty() ? source.substr(start, current - start) : customText;
         // Avoid duplicate consecutive newlines
         if (type == TokenType::NEWLINE) {
             if (!tokens.empty() && tokens.back().type == TokenType::NEWLINE) {
@@ -203,21 +282,30 @@ private:
         while (isAlphaNumeric(peek())) advance();
 
         std::string text = source.substr(start, current - start);
+        std::string corrected = getCorrectedKeyword(text);
+        std::string final_text = text;
+        if (!corrected.empty()) {
+            final_text = corrected;
+            if (corrected != text) {
+                std::cout << "[Auto-Fix] Corrected spelling/casing: '" << text << "' -> '" << corrected << "'\n";
+            }
+        }
+
         TokenType type = TokenType::IDENTIFIER;
-        auto it = keywords.find(text);
+        auto it = keywords.find(final_text);
         if (it != keywords.end()) {
             type = it->second;
         }
         
         // Handle boolean/null literals directly
         if (type == TokenType::TRUE) {
-            addToken(type, Value(true));
+            addToken(type, Value(true), final_text);
         } else if (type == TokenType::FALSE) {
-            addToken(type, Value(false));
+            addToken(type, Value(false), final_text);
         } else if (type == TokenType::NULL_VAL) {
-            addToken(type, Value(Nil{}));
+            addToken(type, Value(Nil{}), final_text);
         } else {
-            addToken(type);
+            addToken(type, final_text);
         }
     }
 

@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 #include <stdexcept>
+#include <iostream>
 #include "ast.hpp"
 
 class ParseError : public std::runtime_error {
@@ -76,7 +77,8 @@ private:
         if (check(TokenType::RIGHT_BRACE) || check(TokenType::EOF_VAL)) {
             return;
         }
-        throw error(peek(), "Expect newline or semicolon after statement.");
+        // Auto-fix missing statement terminator
+        std::cout << "[Auto-Fix] Added missing semicolon\n";
     }
 
     // Expressions
@@ -308,9 +310,17 @@ private:
     }
 
     StmtPtr ifStatement() {
-        consume(TokenType::LEFT_PAREN, "Expect '(' after 'if'.");
+        bool hasLparen = match(TokenType::LEFT_PAREN);
         ExprPtr condition = expression();
-        consume(TokenType::RIGHT_PAREN, "Expect ')' after if condition.");
+        bool hasRparen = match(TokenType::RIGHT_PAREN);
+
+        if (!hasLparen && !hasRparen) {
+            std::cout << "[Auto-Fix] Added missing '(' and ')' for 'if' condition\n";
+        } else if (!hasLparen) {
+            std::cout << "[Auto-Fix] Added missing '(' for 'if' condition\n";
+        } else if (!hasRparen) {
+            std::cout << "[Auto-Fix] Added missing ')' for 'if' condition\n";
+        }
 
         skipNewlines();
         StmtPtr thenBranch = statement();
@@ -330,9 +340,17 @@ private:
     }
 
     StmtPtr whileStatement() {
-        consume(TokenType::LEFT_PAREN, "Expect '(' after 'while'.");
+        bool hasLparen = match(TokenType::LEFT_PAREN);
         ExprPtr condition = expression();
-        consume(TokenType::RIGHT_PAREN, "Expect ')' after while condition.");
+        bool hasRparen = match(TokenType::RIGHT_PAREN);
+
+        if (!hasLparen && !hasRparen) {
+            std::cout << "[Auto-Fix] Added missing '(' and ')' for 'while' condition\n";
+        } else if (!hasLparen) {
+            std::cout << "[Auto-Fix] Added missing '(' for 'while' condition\n";
+        } else if (!hasRparen) {
+            std::cout << "[Auto-Fix] Added missing ')' for 'while' condition\n";
+        }
 
         skipNewlines();
         StmtPtr body = statement();
@@ -340,7 +358,7 @@ private:
     }
 
     StmtPtr forStatement() {
-        consume(TokenType::LEFT_PAREN, "Expect '(' after 'for'.");
+        bool hasLparen = match(TokenType::LEFT_PAREN);
 
         StmtPtr init = nullptr;
         if (!match(TokenType::SEMICOLON)) {
@@ -356,10 +374,19 @@ private:
         }
 
         ExprPtr increment = nullptr;
-        if (!check(TokenType::RIGHT_PAREN)) {
+        if (!check(TokenType::RIGHT_PAREN) && !check(TokenType::LEFT_BRACE) && !isAtEnd()) {
             increment = expression();
         }
-        consume(TokenType::RIGHT_PAREN, "Expect ')' after for clauses.");
+        
+        bool hasRparen = match(TokenType::RIGHT_PAREN);
+
+        if (!hasLparen && !hasRparen) {
+            std::cout << "[Auto-Fix] Added missing '(' and ')' for 'for' loop header\n";
+        } else if (!hasLparen) {
+            std::cout << "[Auto-Fix] Added missing '(' for 'for' loop header\n";
+        } else if (!hasRparen) {
+            std::cout << "[Auto-Fix] Added missing ')' for 'for' loop header\n";
+        }
 
         skipNewlines();
         StmtPtr body = statement();
