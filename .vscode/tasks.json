@@ -1,9 +1,9 @@
 {
     "tasks": [
         {
-            "type": "cppbuild",
+            "type": "shell",
             "label": "Build EpilespyLang",
-            "command": "cl.exe",
+            "command": "${workspaceFolder}\\.vscode\\build.bat",
             "args": [
                 "/Zi",
                 "/EHsc",

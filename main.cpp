@@ -4,6 +4,9 @@
 #include <vector>
 #include <exception>
 #include <cstdlib>
+#define NOMINMAX
+#include <windows.h>
+#include <filesystem>
 #include "value.hpp"
 #include "ast.hpp"
 #include "lexer.hpp"
@@ -145,14 +148,31 @@ void runFile(const std::string& path) {
     }
 }
 
+std::string getExeDirectory() {
+    char buffer[MAX_PATH];
+    GetModuleFileNameA(NULL, buffer, MAX_PATH);
+    std::filesystem::path p(buffer);
+    return p.parent_path().string();
+}
+
 int main(int argc, char* argv[]) {
     if (argc > 2) {
-        std::cout << "Usage: EpilespyLang [script.ep]\n";
+        std::cout << "Usage: EpilespyLang [script.ep] or --repl\n";
         return 1;
     } else if (argc == 2) {
-        runFile(argv[1]);
+        std::string arg = argv[1];
+        if (arg == "--repl") {
+            runREPL();
+        } else {
+            runFile(argv[1]);
+        }
     } else {
-        runREPL();
+        std::cout << "Starting EpilespyLang IDE Server...\n";
+        std::cout << "Make sure Node.js is installed!\n";
+        std::string exeDir = getExeDirectory();
+        std::string cwd = std::filesystem::current_path().string();
+        std::string command = "node \"" + exeDir + "\\ide.js\" \"" + cwd + "\"";
+        std::system(command.c_str());
     }
     return 0;
 }

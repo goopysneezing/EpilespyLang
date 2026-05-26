@@ -105,8 +105,6 @@ function initMonaco() {
 
             // 4. Create Editor Instance
             const container = document.getElementById('monaco-editor-instance');
-            container.style.display = 'block';
-            document.getElementById('empty-editor-message').style.display = 'none';
 
             editor = monaco.editor.create(container, {
                 theme: 'vs-dark',
