@@ -289,11 +289,36 @@ private:
     StmtPtr statement() {
         skipNewlines();
 
+        // Check for redundant 'let' keyword (e.g. let x = 5)
+        if (check(TokenType::IDENTIFIER) && peek().lexeme == "let") {
+            if (current + 2 < tokens.size() &&
+                tokens[current + 1].type == TokenType::IDENTIFIER &&
+                tokens[current + 2].type == TokenType::EQUAL) {
+                advance(); // consume 'let'
+                std::cout << "[Auto-Fix] Ignored redundant 'let' keyword\n";
+            }
+        }
+
         if (match(TokenType::LEFT_BRACE)) return block();
         if (match(TokenType::IF)) return ifStatement();
         if (match(TokenType::WHILE)) return whileStatement();
         if (match(TokenType::FOR)) return forStatement();
         if (match(TokenType::SWITCH)) return switchStatement();
+
+        // Check for print statement without parentheses (e.g. print 1;)
+        if (check(TokenType::IDENTIFIER) && peek().lexeme == "print") {
+            if (current + 1 < tokens.size() && tokens[current + 1].type != TokenType::LEFT_PAREN) {
+                Token printToken = advance(); // consume 'print'
+                std::cout << "[Auto-Fix] Added missing '(' and ')' for print\n";
+                ExprPtr arg = expression();
+                consumeStatementTerminator();
+                
+                ExprPtr callee = std::make_shared<VariableExpr>(printToken);
+                std::vector<ExprPtr> arguments = { arg };
+                ExprPtr call = std::make_shared<CallExpr>(printToken, arguments);
+                return std::make_shared<ExpressionStmt>(call);
+            }
+        }
 
         return expressionStatement();
     }
