@@ -5,8 +5,34 @@ const { spawn, exec } = require('child_process');
 const { URL } = require('url');
 
 const PORT = 8000;
-const WORKSPACE_DIR = process.argv[2] ? path.resolve(process.argv[2]) : process.cwd();
+
+// Parse command line arguments
+let parentPid = null;
+let workspaceArg = null;
+
+for (let i = 2; i < process.argv.length; i++) {
+    if (process.argv[i] === '--parent-pid') {
+        parentPid = parseInt(process.argv[i + 1], 10);
+        i++; // skip pid value
+    } else {
+        workspaceArg = process.argv[i];
+    }
+}
+
+const WORKSPACE_DIR = workspaceArg ? path.resolve(workspaceArg) : process.cwd();
 const STATIC_DIR = path.join(__dirname, 'ide_files');
+
+// Automatically shut down if parent process dies
+if (parentPid && !isNaN(parentPid)) {
+    setInterval(() => {
+        try {
+            process.kill(parentPid, 0);
+        } catch (e) {
+            console.log(`[IDE] Parent process (${parentPid}) has exited. Shutting down server...`);
+            process.exit(0);
+        }
+    }, 1000);
+}
 
 let activeProcess = null;
 

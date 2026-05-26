@@ -1,0 +1,9 @@
+wind = window("g", 900, 900)
+while (true) {
+    if (epilepsy() == 1) {
+        wind.rect(0,0,900,900,"#ffffff")
+    }
+    else {
+        wind.rect(0,0,900,900,"#000000")
+    }
+}
