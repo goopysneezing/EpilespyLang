@@ -13,6 +13,7 @@
 class Interpreter : public ExprVisitor, public StmtVisitor {
 private:
     std::shared_ptr<Environment> environment = std::make_shared<Environment>();
+    bool epilepsyState = false;
 
     void checkNumberOperands(Token op, const Value& left, const Value& right) {
         if (left.isNumber() && right.isNumber()) return;
@@ -439,6 +440,13 @@ public:
         if (calleeName == "rad2deg") {
             checkNumArgs("rad2deg", 1);
             return Value(args[0].asNumber() * 180.0 / 3.14159265358979323846);
+        }
+        if (calleeName == "epilepsy") {
+            if (args.size() != 0) {
+                throw RuntimeError(expr->callee.line, "epilepsy() expects exactly 0 arguments.");
+            }
+            epilepsyState = !epilepsyState;
+            return Value(epilepsyState ? 1.0 : 0.0);
         }
 
         throw RuntimeError(expr->callee.line, "Undefined function '" + calleeName + "'.");
