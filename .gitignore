@@ -1,0 +1,24 @@
+# Node local binaries and folders
+node-local/
+node-v20.13.1-win-x64/
+corepack
+corepack.cmd
+install_tools.bat
+nodevars.bat
+npm
+npm.cmd
+npx
+npx.cmd
+
+# C++ Build artifacts
+*.exe
+*.ilk
+*.pdb
+*.obj
+*.suo
+*.user
+*.db
+*.opendb
+.vs/
+build/
+out/

@@ -59,9 +59,9 @@ const mimeTypes = {
 
 // Recursively walk and list workspace items (folders & files)
 async function listWorkspaceFiles(dir, items = []) {
-    const ignoredDirs = new Set(['.git', '.vscode', 'ide_files', 'node_modules']);
-    const ignoredExts = new Set(['.exe', '.ilk', '.pdb', '.obj']);
-    const ignoredFiles = new Set(['ide.py', 'ide.js', 'vc140.pdb', 'main.obj']);
+    const ignoredDirs = new Set(['.git', '.vscode', 'ide_files', 'node_modules', 'node-local', 'node-v20.13.1-win-x64']);
+    const ignoredExts = new Set(['.exe', '.ilk', '.pdb', '.obj', '.cpp', '.hpp', '.md']);
+    const ignoredFiles = new Set(['ide.py', 'ide.js', 'vc140.pdb', 'main.obj', 'corepack', 'corepack.cmd', 'install_tools.bat', 'nodevars.bat', 'npm', 'npm.cmd', 'npx', 'npx.cmd', '.gitignore']);
 
     const files = await fs.readdir(dir, { withFileTypes: true });
 
@@ -95,9 +95,9 @@ async function listWorkspaceFiles(dir, items = []) {
 
 // Global text search in all workspace files
 async function searchWorkspaceFiles(query, dir = WORKSPACE_DIR, results = {}) {
-    const ignoredDirs = new Set(['.git', '.vscode', 'ide_files', 'node_modules']);
-    const ignoredExts = new Set(['.exe', '.ilk', '.pdb', '.obj']);
-    const ignoredFiles = new Set(['ide.py', 'ide.js', 'vc140.pdb', 'main.obj']);
+    const ignoredDirs = new Set(['.git', '.vscode', 'ide_files', 'node_modules', 'node-local', 'node-v20.13.1-win-x64']);
+    const ignoredExts = new Set(['.exe', '.ilk', '.pdb', '.obj', '.cpp', '.hpp', '.md']);
+    const ignoredFiles = new Set(['ide.py', 'ide.js', 'vc140.pdb', 'main.obj', 'corepack', 'corepack.cmd', 'install_tools.bat', 'nodevars.bat', 'npm', 'npm.cmd', 'npx', 'npx.cmd', '.gitignore']);
 
     const files = await fs.readdir(dir, { withFileTypes: true });
 
