@@ -155,6 +155,13 @@ const server = http.createServer(async (req, res) => {
     try {
         // --- API ROUTES ---
 
+        // 0. GET: Ping / Health Check
+        if (req.method === 'GET' && pathname === '/api/ping') {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ active: true }));
+            return;
+        }
+
         // 1. GET: List Files
         if (req.method === 'GET' && pathname === '/api/files') {
             const filesList = await listWorkspaceFiles(WORKSPACE_DIR);

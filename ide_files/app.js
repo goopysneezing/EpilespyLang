@@ -930,4 +930,59 @@ window.addEventListener('DOMContentLoaded', async () => {
             saveCurrentFile();
         }
     });
+
+    // 12. Start connection heartbeat checks to auto-close when server shuts down (Ctrl+C)
+    startHeartbeat();
 });
+
+// Heartbeat to check if server goes down and auto-close page
+function startHeartbeat() {
+    setInterval(async () => {
+        try {
+            const response = await fetch('/api/ping');
+            if (!response.ok) throw new Error();
+        } catch (err) {
+            // Attempt to close the window/tab
+            window.open('', '_self', '');
+            window.close();
+            
+            // Render beautiful disconnected overlay in case browser blocks window.close()
+            showDisconnectedOverlay();
+        }
+    }, 1500);
+}
+
+function showDisconnectedOverlay() {
+    if (document.getElementById('disconnected-overlay')) return;
+    
+    const overlay = document.createElement('div');
+    overlay.id = 'disconnected-overlay';
+    overlay.style.position = 'fixed';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.width = '100vw';
+    overlay.style.height = '100vh';
+    overlay.style.background = 'rgba(15, 23, 42, 0.95)';
+    overlay.style.backdropFilter = 'blur(10px)';
+    overlay.style.zIndex = '99999';
+    overlay.style.display = 'flex';
+    overlay.style.flexDirection = 'column';
+    overlay.style.justifyContent = 'center';
+    overlay.style.alignItems = 'center';
+    overlay.style.color = '#f8fafc';
+    overlay.style.fontFamily = "'Outfit', system-ui, sans-serif";
+    
+    overlay.innerHTML = `
+        <div style="text-align: center; max-width: 400px; padding: 2.5rem; border-radius: 16px; background: #1e293b; border: 1px solid #334155; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);">
+            <div style="font-size: 3.5rem; margin-bottom: 1rem;">⚡</div>
+            <h2 style="font-size: 1.5rem; margin-bottom: 0.5rem; font-weight: 700; background: linear-gradient(135deg, #f87171, #ef4444); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">IDE Session Closed</h2>
+            <p style="color: #94a3b8; font-size: 0.95rem; line-height: 1.5; margin-bottom: 2rem;">
+                The server connection was lost (e.g. server shut down or Ctrl+C). You can safely close this tab now.
+            </p>
+            <button onclick="window.location.reload()" style="background: #3b82f6; hover:background: #2563eb; color: white; border: none; padding: 0.75rem 1.75rem; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s ease;">
+                Retry Connecting
+            </button>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+}
