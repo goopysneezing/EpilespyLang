@@ -1,0 +1,5 @@
+if ture {
+    print 1;
+}
+let y = flase;
+abc print y;

@@ -168,10 +168,19 @@ int main(int argc, char* argv[]) {
         }
     } else {
         std::cout << "Starting EpilespyLang IDE Server...\n";
-        std::cout << "Make sure Node.js is installed!\n";
         std::string exeDir = getExeDirectory();
         std::string cwd = std::filesystem::current_path().string();
-        std::string command = "node \"" + exeDir + "\\ide.js\" \"" + cwd + "\"";
+        
+        // Resolve Node.js path (check local installation first, otherwise fallback to system node)
+        std::string nodePath = "node";
+        std::string localNodePath = exeDir + "\\node-local\\node-v20.13.1-win-x64\\node.exe";
+        if (std::filesystem::exists(localNodePath)) {
+            nodePath = "\"" + localNodePath + "\"";
+        } else {
+            std::cout << "Using system Node.js. Make sure Node.js is installed!\n";
+        }
+
+        std::string command = "\"" + nodePath + " \"" + exeDir + "\\ide.js\" --parent-pid " + std::to_string(GetCurrentProcessId()) + " \"" + cwd + "\"\"";
         std::system(command.c_str());
     }
     return 0;

@@ -5,8 +5,34 @@ const { spawn, exec } = require('child_process');
 const { URL } = require('url');
 
 const PORT = 8000;
-const WORKSPACE_DIR = process.argv[2] ? path.resolve(process.argv[2]) : process.cwd();
+
+// Parse command line arguments
+let parentPid = null;
+let workspaceArg = null;
+
+for (let i = 2; i < process.argv.length; i++) {
+    if (process.argv[i] === '--parent-pid') {
+        parentPid = parseInt(process.argv[i + 1], 10);
+        i++; // skip pid value
+    } else {
+        workspaceArg = process.argv[i];
+    }
+}
+
+const WORKSPACE_DIR = workspaceArg ? path.resolve(workspaceArg) : process.cwd();
 const STATIC_DIR = path.join(__dirname, 'ide_files');
+
+// Automatically shut down if parent process dies
+if (parentPid && !isNaN(parentPid)) {
+    setInterval(() => {
+        try {
+            process.kill(parentPid, 0);
+        } catch (e) {
+            console.log(`[IDE] Parent process (${parentPid}) has exited. Shutting down server...`);
+            process.exit(0);
+        }
+    }, 1000);
+}
 
 let activeProcess = null;
 
@@ -33,9 +59,9 @@ const mimeTypes = {
 
 // Recursively walk and list workspace items (folders & files)
 async function listWorkspaceFiles(dir, items = []) {
-    const ignoredDirs = new Set(['.git', '.vscode', 'ide_files', 'node_modules']);
-    const ignoredExts = new Set(['.exe', '.ilk', '.pdb', '.obj']);
-    const ignoredFiles = new Set(['ide.py', 'ide.js', 'vc140.pdb', 'main.obj']);
+    const ignoredDirs = new Set(['.git', '.vscode', 'ide_files', 'node_modules', 'node-local', 'node-v20.13.1-win-x64']);
+    const ignoredExts = new Set(['.exe', '.ilk', '.pdb', '.obj', '.cpp', '.hpp', '.md']);
+    const ignoredFiles = new Set(['ide.py', 'ide.js', 'vc140.pdb', 'main.obj', 'corepack', 'corepack.cmd', 'install_tools.bat', 'nodevars.bat', 'npm', 'npm.cmd', 'npx', 'npx.cmd']);
 
     const files = await fs.readdir(dir, { withFileTypes: true });
 
@@ -69,9 +95,9 @@ async function listWorkspaceFiles(dir, items = []) {
 
 // Global text search in all workspace files
 async function searchWorkspaceFiles(query, dir = WORKSPACE_DIR, results = {}) {
-    const ignoredDirs = new Set(['.git', '.vscode', 'ide_files', 'node_modules']);
-    const ignoredExts = new Set(['.exe', '.ilk', '.pdb', '.obj']);
-    const ignoredFiles = new Set(['ide.py', 'ide.js', 'vc140.pdb', 'main.obj']);
+    const ignoredDirs = new Set(['.git', '.vscode', 'ide_files', 'node_modules', 'node-local', 'node-v20.13.1-win-x64']);
+    const ignoredExts = new Set(['.exe', '.ilk', '.pdb', '.obj', '.cpp', '.hpp', '.md']);
+    const ignoredFiles = new Set(['ide.py', 'ide.js', 'vc140.pdb', 'main.obj', 'corepack', 'corepack.cmd', 'install_tools.bat', 'nodevars.bat', 'npm', 'npm.cmd', 'npx', 'npx.cmd']);
 
     const files = await fs.readdir(dir, { withFileTypes: true });
 
@@ -256,7 +282,7 @@ const server = http.createServer(async (req, res) => {
             };
 
             const compileCmd = 'cl.exe';
-            const compileArgs = ['/Zi', '/EHsc', '/std:c++17', '/nologo', '/FeEpilespyLang.exe', 'main.cpp'];
+            const compileArgs = ['/Zi', '/EHsc', '/std:c++17', '/nologo', '/FeEpilespyLang.exe', 'main.cpp', 'gdi32.lib', 'user32.lib', 'wininet.lib'];
 
             const compileProcess = spawn(compileCmd, compileArgs, { cwd: __dirname });
 
