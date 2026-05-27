@@ -1,0 +1,71 @@
+win = gameWindow3D("EpilespyLang 3D Demo", 800, 600)
+
+# Add a ground grid
+win.addGrid(0, 0, 30, 2, "gray")
+
+# Add floating cubes of various colors and sizes
+win.addCube(-4, 2, 4, 1.5, "red")
+win.addCube(4, 3, 8, 2, "blue")
+win.addCube(0, 1, 6, 1, "green")
+win.addCube(-2, 4, 10, 2.5, "yellow")
+win.addCube(3, 1, 3, 0.8, "magenta")
+win.addCube(-6, 3, 12, 3, "cyan")
+
+# Initial camera state
+cx = 0
+cy = 2
+cz = -8
+pitch = 0
+yaw = 0
+win.setCamera(cx, cy, cz, pitch, yaw)
+
+speed = 0.15
+rotSpeed = 0.03
+
+while (win.isOpen()) {
+    # Move Camera Forward/Backward (W/S or Up/Down)
+    if (win.getKey("w") or win.getKey("up")) {
+        win.moveCamera(speed, 0, 0)
+    }
+    if (win.getKey("s") or win.getKey("down")) {
+        win.moveCamera(-speed, 0, 0)
+    }
+
+    # Move Camera Left/Right (A/D or Left/Right)
+    if (win.getKey("a") or win.getKey("left")) {
+        win.moveCamera(0, -speed, 0)
+    }
+    if (win.getKey("d") or win.getKey("right")) {
+        win.moveCamera(0, speed, 0)
+    }
+
+    # Fly Up/Down (Q/E)
+    if (win.getKey("q")) {
+        win.moveCamera(0, 0, speed)
+    }
+    if (win.getKey("e")) {
+        win.moveCamera(0, 0, -speed)
+    }
+
+    # Look Around (Mouse Left Click and Drag)
+    if (win.getMouseLeft()) {
+        mx = win.getMouseX()
+        my = win.getMouseY()
+        
+        # Calculate angular rotation based on center of screen (400, 300)
+        dyaw = (mx - 400) * 0.0001
+        dpitch = (my - 300) * 0.0001
+        
+        win.rotateCamera(dpitch, dyaw)
+    }
+
+    # Draw Frame
+    win.clear("black")
+    win.render3D()
+
+    # Render a 2D HUD text overlay
+    win.text(20, 20, "FLY: W/S/A/D (or Arrows), Q/E (Up/Down)", "white", 16)
+    win.text(20, 45, "LOOK: Click + Drag Mouse", "white", 16)
+    
+    sleep(16)
+}

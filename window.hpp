@@ -43,6 +43,35 @@ inline COLORREF parseColor(const std::string& colorName) {
     return RGB(255, 255, 255); // default to white
 }
 
+#include <vector>
+#include <algorithm>
+
+struct Vertex3D {
+    double x, y, z;
+};
+
+struct Face3D {
+    int indices[4];
+    int numVertices;
+    std::string color;
+    double depth;
+};
+
+struct Object3D {
+    std::string type; // "cube" or "grid"
+    std::vector<Vertex3D> vertices;
+    std::vector<Face3D> faces;
+    double px, py, pz;
+    double rx, ry, rz;
+    double scaleX, scaleY, scaleZ;
+};
+
+struct Object2D {
+    std::string type; // "rect" or "circle"
+    double x, y, w, h, r;
+    std::string color;
+};
+
 class WindowInstance {
 public:
     HWND hwnd = nullptr;
@@ -63,6 +92,15 @@ public:
     double mouseY = 0;
     bool mouseLeft = false;
     bool keys[256] = {false};
+
+    // 3D/2D properties
+    bool is3D = false;
+    bool is2D = false;
+    double camX = 0, camY = 0, camZ = 0;
+    double camPitch = 0, camYaw = 0;
+    double cam2DX = 0, cam2DY = 0, cam2DZoom = 1.0;
+    std::vector<Object3D> objects3D;
+    std::vector<Object2D> objects2D;
 
     WindowInstance(const std::string& title, int w, int h)
         : title(title), width(w), height(h) {
@@ -226,6 +264,315 @@ public:
         if (hdcMem == nullptr) return;
         COLORREF color = parseColor(colorName);
         SetPixel(hdcMem, x, y, color);
+        invalidate();
+    }
+
+    // 3D Engine Methods
+    void addCube(double x, double y, double z, double size, const std::string& colorName) {
+        std::lock_guard<std::mutex> lock(mtx);
+        double s = size / 2.0;
+        Object3D obj;
+        obj.type = "cube";
+        obj.px = x; obj.py = y; obj.pz = z;
+        obj.rx = 0; obj.ry = 0; obj.rz = 0;
+        obj.scaleX = 1; obj.scaleY = 1; obj.scaleZ = 1;
+
+        // 8 vertices
+        obj.vertices = {
+            {-s, -s, -s}, {s, -s, -s}, {s, s, -s}, {-s, s, -s},
+            {-s, -s, s},  {s, -s, s},  {s, s, s},  {-s, s, s}
+        };
+
+        // 6 faces
+        obj.faces = {
+            {{0, 3, 2, 1}, 4, colorName, 0.0}, // Front
+            {{5, 6, 7, 4}, 4, colorName, 0.0}, // Back
+            {{4, 7, 3, 0}, 4, colorName, 0.0}, // Left
+            {{1, 2, 6, 5}, 4, colorName, 0.0}, // Right
+            {{3, 7, 6, 2}, 4, colorName, 0.0}, // Top
+            {{0, 1, 5, 4}, 4, colorName, 0.0}  // Bottom
+        };
+
+        objects3D.push_back(obj);
+    }
+
+    void addGrid(double x, double z, double size, double spacing, const std::string& colorName) {
+        std::lock_guard<std::mutex> lock(mtx);
+        double halfSize = size / 2.0;
+        Object3D obj;
+        obj.type = "grid";
+        obj.px = x; obj.py = 0; obj.pz = z;
+        obj.rx = 0; obj.ry = 0; obj.rz = 0;
+        obj.scaleX = 1; obj.scaleY = 1; obj.scaleZ = 1;
+
+        int idx = 0;
+        for (double i = -halfSize; i <= halfSize; i += spacing) {
+            // Line along Z axis
+            obj.vertices.push_back({i, 0, -halfSize});
+            obj.vertices.push_back({i, 0, halfSize});
+            Face3D f1;
+            f1.indices[0] = idx++;
+            f1.indices[1] = idx++;
+            f1.numVertices = 2;
+            f1.color = colorName;
+            f1.depth = 0.0;
+            obj.faces.push_back(f1);
+
+            // Line along X axis
+            obj.vertices.push_back({-halfSize, 0, i});
+            obj.vertices.push_back({halfSize, 0, i});
+            Face3D f2;
+            f2.indices[0] = idx++;
+            f2.indices[1] = idx++;
+            f2.numVertices = 2;
+            f2.color = colorName;
+            f2.depth = 0.0;
+            obj.faces.push_back(f2);
+        }
+
+        objects3D.push_back(obj);
+    }
+
+    void setCamera(double x, double y, double z, double pitch, double yaw) {
+        std::lock_guard<std::mutex> lock(mtx);
+        camX = x;
+        camY = y;
+        camZ = z;
+        camPitch = pitch;
+        camYaw = yaw;
+    }
+
+    void moveCamera(double forward, double right, double up) {
+        std::lock_guard<std::mutex> lock(mtx);
+        double fx = std::sin(camYaw) * std::cos(camPitch);
+        double fy = -std::sin(camPitch);
+        double fz = std::cos(camYaw) * std::cos(camPitch);
+
+        double rx = std::cos(camYaw);
+        double ry = 0;
+        double rz = -std::sin(camYaw);
+
+        camX += forward * fx + right * rx;
+        camY += forward * fy + right * ry + up;
+        camZ += forward * fz + right * rz;
+    }
+
+    void rotateCamera(double dpitch, double dyaw) {
+        std::lock_guard<std::mutex> lock(mtx);
+        camPitch += dpitch;
+        camYaw += dyaw;
+
+        if (camPitch > 1.5) camPitch = 1.5;
+        if (camPitch < -1.5) camPitch = -1.5;
+    }
+
+    void clear3D() {
+        std::lock_guard<std::mutex> lock(mtx);
+        objects3D.clear();
+    }
+
+    void render3D() {
+        std::lock_guard<std::mutex> lock(mtx);
+        if (hdcMem == nullptr) return;
+
+        struct RenderTask {
+            std::vector<POINT> screenPoints;
+            int numVertices;
+            COLORREF colorRef;
+            double depth;
+        };
+        std::vector<RenderTask> renderTasks;
+
+        double fov = 400.0;
+        double halfW = width / 2.0;
+        double halfH = height / 2.0;
+
+        double cosYaw = std::cos(-camYaw);
+        double sinYaw = std::sin(-camYaw);
+        double cosPitch = std::cos(-camPitch);
+        double sinPitch = std::sin(-camPitch);
+
+        for (const auto& obj : objects3D) {
+            double cosRX = std::cos(obj.rx), sinRX = std::sin(obj.rx);
+            double cosRY = std::cos(obj.ry), sinRY = std::sin(obj.ry);
+            double cosRZ = std::cos(obj.rz), sinRZ = std::sin(obj.rz);
+
+            std::vector<Vertex3D> camVertices;
+            camVertices.reserve(obj.vertices.size());
+
+            for (const auto& v : obj.vertices) {
+                double sx = v.x * obj.scaleX;
+                double sy = v.y * obj.scaleY;
+                double sz = v.z * obj.scaleZ;
+
+                double x1 = sx * cosRZ - sy * sinRZ;
+                double y1 = sx * sinRZ + sy * cosRZ;
+                double z1 = sz;
+
+                double x2 = x1 * cosRY + z1 * sinRY;
+                double y2 = y1;
+                double z2 = -x1 * sinRY + z1 * cosRY;
+
+                double x3 = x2;
+                double y3 = y2 * cosRX - z2 * sinRX;
+                double z3 = y2 * sinRX + z2 * cosRX;
+
+                double wx = x3 + obj.px;
+                double wy = y3 + obj.py;
+                double wz = z3 + obj.pz;
+
+                double cx_rel = wx - camX;
+                double cy_rel = wy - camY;
+                double cz_rel = wz - camZ;
+
+                double cx_rot = cx_rel * cosYaw - cz_rel * sinYaw;
+                double cz_rot = cx_rel * sinYaw + cz_rel * cosYaw;
+
+                double cy_rot = cy_rel * cosPitch - cz_rot * sinPitch;
+                double cz_final = cy_rel * sinPitch + cz_rot * cosPitch;
+
+                camVertices.push_back({cx_rot, cy_rot, cz_final});
+            }
+
+            for (const auto& face : obj.faces) {
+                double sumDepth = 0.0;
+                bool allBehind = true;
+                std::vector<POINT> projPoints;
+                projPoints.reserve(face.numVertices);
+
+                for (int i = 0; i < face.numVertices; ++i) {
+                    int idx = face.indices[i];
+                    const auto& cv = camVertices[idx];
+                    sumDepth += cv.z;
+                    if (cv.z > 0.1) {
+                        allBehind = false;
+                    }
+
+                    double denom = cv.z > 0.1 ? cv.z : 0.1;
+                    int sx = static_cast<int>(halfW + (cv.x * fov / denom));
+                    int sy = static_cast<int>(halfH - (cv.y * fov / denom));
+                    projPoints.push_back({sx, sy});
+                }
+
+                if (allBehind) continue;
+
+                RenderTask task;
+                task.screenPoints = projPoints;
+                task.numVertices = face.numVertices;
+                task.colorRef = parseColor(face.color);
+                task.depth = sumDepth / face.numVertices;
+                renderTasks.push_back(task);
+            }
+        }
+
+        std::sort(renderTasks.begin(), renderTasks.end(), [](const RenderTask& a, const RenderTask& b) {
+            return a.depth > b.depth;
+        });
+
+        for (const auto& task : renderTasks) {
+            if (task.numVertices == 2) {
+                HPEN pen = CreatePen(PS_SOLID, 1, task.colorRef);
+                HPEN oldPen = (HPEN)SelectObject(hdcMem, pen);
+                MoveToEx(hdcMem, task.screenPoints[0].x, task.screenPoints[0].y, NULL);
+                LineTo(hdcMem, task.screenPoints[1].x, task.screenPoints[1].y);
+                SelectObject(hdcMem, oldPen);
+                DeleteObject(pen);
+            } else {
+                HBRUSH brush = CreateSolidBrush(task.colorRef);
+                HPEN pen = CreatePen(PS_SOLID, 1, task.colorRef);
+                HBRUSH oldBrush = (HBRUSH)SelectObject(hdcMem, brush);
+                HPEN oldPen = (HPEN)SelectObject(hdcMem, pen);
+
+                Polygon(hdcMem, task.screenPoints.data(), task.numVertices);
+
+                SelectObject(hdcMem, oldBrush);
+                SelectObject(hdcMem, oldPen);
+                DeleteObject(brush);
+                DeleteObject(pen);
+            }
+        }
+
+        invalidate();
+    }
+
+    // 2D Engine Methods
+    void addRect2D(double x, double y, double w, double h, const std::string& colorName) {
+        std::lock_guard<std::mutex> lock(mtx);
+        Object2D obj;
+        obj.type = "rect";
+        obj.x = x; obj.y = y; obj.w = w; obj.h = h; obj.r = 0;
+        obj.color = colorName;
+        objects2D.push_back(obj);
+    }
+
+    void addCircle2D(double x, double y, double r, const std::string& colorName) {
+        std::lock_guard<std::mutex> lock(mtx);
+        Object2D obj;
+        obj.type = "circle";
+        obj.x = x; obj.y = y; obj.w = 0; obj.h = 0; obj.r = r;
+        obj.color = colorName;
+        objects2D.push_back(obj);
+    }
+
+    void setCamera2D(double cx, double cy, double zoom) {
+        std::lock_guard<std::mutex> lock(mtx);
+        cam2DX = cx;
+        cam2DY = cy;
+        cam2DZoom = zoom;
+    }
+
+    void moveCamera2D(double dx, double dy) {
+        std::lock_guard<std::mutex> lock(mtx);
+        cam2DX += dx;
+        cam2DY += dy;
+    }
+
+    void clear2D() {
+        std::lock_guard<std::mutex> lock(mtx);
+        objects2D.clear();
+    }
+
+    void render2D() {
+        std::lock_guard<std::mutex> lock(mtx);
+        if (hdcMem == nullptr) return;
+
+        double halfW = width / 2.0;
+        double halfH = height / 2.0;
+
+        for (const auto& obj : objects2D) {
+            COLORREF color = parseColor(obj.color);
+            HBRUSH brush = CreateSolidBrush(color);
+            HPEN pen = CreatePen(PS_SOLID, 1, color);
+            HBRUSH oldBrush = (HBRUSH)SelectObject(hdcMem, brush);
+            HPEN oldPen = (HPEN)SelectObject(hdcMem, pen);
+
+            double tx = halfW + (obj.x - cam2DX) * cam2DZoom;
+            double ty = halfH - (obj.y - cam2DY) * cam2DZoom;
+
+            if (obj.type == "rect") {
+                double tw = obj.w * cam2DZoom;
+                double th = obj.h * cam2DZoom;
+                RECT r = {
+                    static_cast<LONG>(tx - tw / 2.0),
+                    static_cast<LONG>(ty - th / 2.0),
+                    static_cast<LONG>(tx + tw / 2.0),
+                    static_cast<LONG>(ty + th / 2.0)
+                };
+                FillRect(hdcMem, &r, brush);
+            } else if (obj.type == "circle") {
+                double tr = obj.r * cam2DZoom;
+                Ellipse(hdcMem,
+                    static_cast<int>(tx - tr), static_cast<int>(ty - tr),
+                    static_cast<int>(tx + tr), static_cast<int>(ty + tr)
+                );
+            }
+
+            SelectObject(hdcMem, oldBrush);
+            SelectObject(hdcMem, oldPen);
+            DeleteObject(brush);
+            DeleteObject(pen);
+        }
+
         invalidate();
     }
 

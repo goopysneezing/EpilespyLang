@@ -338,6 +338,40 @@ public:
             return Value(win);
         }
 
+        if (calleeName == "gameWindow3D") {
+            if (args.size() != 3) {
+                throw RuntimeError(expr->callee.line, "gameWindow3D() expects exactly 3 arguments (title, width, height).");
+            }
+            if (!args[0].isString() || !args[1].isNumber() || !args[2].isNumber()) {
+                throw RuntimeError(expr->callee.line, "gameWindow3D() arguments must be (string, number, number).");
+            }
+            std::string title = args[0].asString();
+            int w = static_cast<int>(args[1].asNumber());
+            int h = static_cast<int>(args[2].asNumber());
+            
+            auto win = std::make_shared<WindowInstance>(title, w, h);
+            win->is3D = true;
+            win->camX = 0; win->camY = 2; win->camZ = -5;
+            win->camPitch = 0; win->camYaw = 0;
+            return Value(win);
+        }
+
+        if (calleeName == "gameWindow2D") {
+            if (args.size() != 3) {
+                throw RuntimeError(expr->callee.line, "gameWindow2D() expects exactly 3 arguments (title, width, height).");
+            }
+            if (!args[0].isString() || !args[1].isNumber() || !args[2].isNumber()) {
+                throw RuntimeError(expr->callee.line, "gameWindow2D() arguments must be (string, number, number).");
+            }
+            std::string title = args[0].asString();
+            int w = static_cast<int>(args[1].asNumber());
+            int h = static_cast<int>(args[2].asNumber());
+            
+            auto win = std::make_shared<WindowInstance>(title, w, h);
+            win->is2D = true;
+            return Value(win);
+        }
+
         if (calleeName == "sleep") {
             if (args.size() != 1) {
                 throw RuntimeError(expr->callee.line, "sleep() expects exactly 1 argument (milliseconds).");
@@ -713,6 +747,112 @@ public:
         if (methodName == "close") {
             if (args.size() != 0) throw RuntimeError(expr->method.line, "close() expects 0 arguments.");
             win->close();
+            return obj;
+        }
+
+        // 3D/2D Game Engine Method Bindings
+        if (methodName == "addCube") {
+            if (args.size() != 5) throw RuntimeError(expr->method.line, "addCube() expects exactly 5 arguments (x, y, z, size, color).");
+            if (!args[0].isNumber() || !args[1].isNumber() || !args[2].isNumber() || !args[3].isNumber() || !args[4].isString()) {
+                throw RuntimeError(expr->method.line, "addCube() expects (number, number, number, number, string).");
+            }
+            win->addCube(args[0].asNumber(), args[1].asNumber(), args[2].asNumber(), args[3].asNumber(), args[4].asString());
+            return obj;
+        }
+
+        if (methodName == "addGrid") {
+            if (args.size() != 5) throw RuntimeError(expr->method.line, "addGrid() expects exactly 5 arguments (x, z, size, spacing, color).");
+            if (!args[0].isNumber() || !args[1].isNumber() || !args[2].isNumber() || !args[3].isNumber() || !args[4].isString()) {
+                throw RuntimeError(expr->method.line, "addGrid() expects (number, number, number, number, string).");
+            }
+            win->addGrid(args[0].asNumber(), args[1].asNumber(), args[2].asNumber(), args[3].asNumber(), args[4].asString());
+            return obj;
+        }
+
+        if (methodName == "setCamera") {
+            if (args.size() != 5) throw RuntimeError(expr->method.line, "setCamera() expects exactly 5 arguments (x, y, z, pitch, yaw).");
+            if (!args[0].isNumber() || !args[1].isNumber() || !args[2].isNumber() || !args[3].isNumber() || !args[4].isNumber()) {
+                throw RuntimeError(expr->method.line, "setCamera() expects (number, number, number, number, number).");
+            }
+            win->setCamera(args[0].asNumber(), args[1].asNumber(), args[2].asNumber(), args[3].asNumber(), args[4].asNumber());
+            return obj;
+        }
+
+        if (methodName == "moveCamera") {
+            if (args.size() != 3) throw RuntimeError(expr->method.line, "moveCamera() expects exactly 3 arguments (forward, right, up).");
+            if (!args[0].isNumber() || !args[1].isNumber() || !args[2].isNumber()) {
+                throw RuntimeError(expr->method.line, "moveCamera() expects (number, number, number).");
+            }
+            win->moveCamera(args[0].asNumber(), args[1].asNumber(), args[2].asNumber());
+            return obj;
+        }
+
+        if (methodName == "rotateCamera") {
+            if (args.size() != 2) throw RuntimeError(expr->method.line, "rotateCamera() expects exactly 2 arguments (dpitch, dyaw).");
+            if (!args[0].isNumber() || !args[1].isNumber()) {
+                throw RuntimeError(expr->method.line, "rotateCamera() expects (number, number).");
+            }
+            win->rotateCamera(args[0].asNumber(), args[1].asNumber());
+            return obj;
+        }
+
+        if (methodName == "clear3D") {
+            if (args.size() != 0) throw RuntimeError(expr->method.line, "clear3D() expects 0 arguments.");
+            win->clear3D();
+            return obj;
+        }
+
+        if (methodName == "render3D") {
+            if (args.size() != 0) throw RuntimeError(expr->method.line, "render3D() expects 0 arguments.");
+            win->render3D();
+            return obj;
+        }
+
+        if (methodName == "addRect2D") {
+            if (args.size() != 5) throw RuntimeError(expr->method.line, "addRect2D() expects exactly 5 arguments (x, y, w, h, color).");
+            if (!args[0].isNumber() || !args[1].isNumber() || !args[2].isNumber() || !args[3].isNumber() || !args[4].isString()) {
+                throw RuntimeError(expr->method.line, "addRect2D() expects (number, number, number, number, string).");
+            }
+            win->addRect2D(args[0].asNumber(), args[1].asNumber(), args[2].asNumber(), args[3].asNumber(), args[4].asString());
+            return obj;
+        }
+
+        if (methodName == "addCircle2D") {
+            if (args.size() != 4) throw RuntimeError(expr->method.line, "addCircle2D() expects exactly 4 arguments (x, y, r, color).");
+            if (!args[0].isNumber() || !args[1].isNumber() || !args[2].isNumber() || !args[3].isString()) {
+                throw RuntimeError(expr->method.line, "addCircle2D() expects (number, number, number, string).");
+            }
+            win->addCircle2D(args[0].asNumber(), args[1].asNumber(), args[2].asNumber(), args[3].asString());
+            return obj;
+        }
+
+        if (methodName == "setCamera2D") {
+            if (args.size() != 3) throw RuntimeError(expr->method.line, "setCamera2D() expects exactly 3 arguments (cx, cy, zoom).");
+            if (!args[0].isNumber() || !args[1].isNumber() || !args[2].isNumber()) {
+                throw RuntimeError(expr->method.line, "setCamera2D() expects (number, number, number).");
+            }
+            win->setCamera2D(args[0].asNumber(), args[1].asNumber(), args[2].asNumber());
+            return obj;
+        }
+
+        if (methodName == "moveCamera2D") {
+            if (args.size() != 2) throw RuntimeError(expr->method.line, "moveCamera2D() expects exactly 2 arguments (dx, dy).");
+            if (!args[0].isNumber() || !args[1].isNumber()) {
+                throw RuntimeError(expr->method.line, "moveCamera2D() expects (number, number).");
+            }
+            win->moveCamera2D(args[0].asNumber(), args[1].asNumber());
+            return obj;
+        }
+
+        if (methodName == "clear2D") {
+            if (args.size() != 0) throw RuntimeError(expr->method.line, "clear2D() expects 0 arguments.");
+            win->clear2D();
+            return obj;
+        }
+
+        if (methodName == "render2D") {
+            if (args.size() != 0) throw RuntimeError(expr->method.line, "render2D() expects 0 arguments.");
+            win->render2D();
             return obj;
         }
 

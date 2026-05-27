@@ -175,6 +175,9 @@ res = (x + 10) * 2</code></pre>
                         <li><code>sleep(ms)</code>: Sleep thread in ms</li>
                         <li><code>epilepsy()</code>: Alternates returning 1 and 0</li>
                         <li><code>fetch(uri)</code>: Read data from online or local URI</li>
+                        <li><code>window(title, w, h)</code>: Standard Win32 Window</li>
+                        <li><code>gameWindow3D(title, w, h)</code>: 3D Render Window</li>
+                        <li><code>gameWindow2D(title, w, h)</code>: 2D Camera Window</li>
                     </ul>
 
                     <h5>Math Constants</h5>
@@ -197,6 +200,21 @@ res = (x + 10) * 2</code></pre>
                         <li><code>ceil(x)</code> / <code>floor(x)</code> / <code>round(x)</code>: Rounding</li>
                         <li><code>min(a, b)</code> / <code>max(a, b)</code>: Min/max values</li>
                         <li><code>deg2rad(x)</code> / <code>rad2deg(x)</code>: Deg/rad conversion</li>
+                    </ul>
+
+                    <h5>Game Engine APIs (3D/2D)</h5>
+                    <ul>
+                        <li><code>win.addCube(x, y, z, size, color)</code>: Add 3D Cube</li>
+                        <li><code>win.addGrid(x, z, size, spacing, color)</code>: Add 3D Floor Grid</li>
+                        <li><code>win.setCamera(x, y, z, pitch, yaw)</code>: Set 3D Camera</li>
+                        <li><code>win.moveCamera(fwd, right, up)</code>: Move 3D Camera relative</li>
+                        <li><code>win.rotateCamera(dpitch, dyaw)</code>: Rotate 3D Camera</li>
+                        <li><code>win.clear3D()</code> / <code>win.render3D()</code>: Manage 3D Buffers</li>
+                        <li><code>win.addRect2D(x, y, w, h, color)</code>: Add 2D Rectangle</li>
+                        <li><code>win.addCircle2D(x, y, r, color)</code>: Add 2D Circle</li>
+                        <li><code>win.setCamera2D(cx, cy, zoom)</code>: Set 2D Camera</li>
+                        <li><code>win.moveCamera2D(dx, dy)</code>: Translate 2D Camera</li>
+                        <li><code>win.clear2D()</code> / <code>win.render2D()</code>: Manage 2D Buffers</li>
                     </ul>
                 </div>
             </div>
