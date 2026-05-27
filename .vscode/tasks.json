@@ -14,7 +14,8 @@
                 "gdi32.lib",
                 "user32.lib",
                 "wininet.lib",
-                "winmm.lib"
+                "winmm.lib",
+                "opengl32.lib"
             ],
             "options": {
                 "cwd": "${workspaceFolder}"

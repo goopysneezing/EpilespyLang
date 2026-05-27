@@ -15,6 +15,8 @@ struct Value;
 using ValueArray = std::shared_ptr<std::vector<Value>>;
 using WindowPtr = std::shared_ptr<WindowInstance>;
 using SoundPtr = std::shared_ptr<SoundInstance>;
+class FormInstance;
+using FormPtr = std::shared_ptr<FormInstance>;
 
 class RuntimeError : public std::runtime_error {
 public:
@@ -30,7 +32,7 @@ struct Nil {
 
 class Value {
 public:
-    std::variant<Nil, bool, double, std::string, ValueArray, WindowPtr, SoundPtr> asVariant;
+    std::variant<Nil, bool, double, std::string, ValueArray, WindowPtr, SoundPtr, FormPtr> asVariant;
 
     Value() : asVariant(Nil{}) {}
     Value(Nil) : asVariant(Nil{}) {}
@@ -41,6 +43,7 @@ public:
     Value(ValueArray arr) : asVariant(arr) {}
     Value(WindowPtr win) : asVariant(win) {}
     Value(SoundPtr snd) : asVariant(snd) {}
+    Value(FormPtr frm) : asVariant(frm) {}
 
     bool isNil() const { return std::holds_alternative<Nil>(asVariant); }
     bool isBool() const { return std::holds_alternative<bool>(asVariant); }
@@ -49,6 +52,7 @@ public:
     bool isArray() const { return std::holds_alternative<ValueArray>(asVariant); }
     bool isWindow() const { return std::holds_alternative<WindowPtr>(asVariant); }
     bool isSound() const { return std::holds_alternative<SoundPtr>(asVariant); }
+    bool isForm() const { return std::holds_alternative<FormPtr>(asVariant); }
 
     bool asBool() const { return std::get<bool>(asVariant); }
     double asNumber() const { return std::get<double>(asVariant); }
@@ -56,6 +60,7 @@ public:
     ValueArray asArray() const { return std::get<ValueArray>(asVariant); }
     WindowPtr asWindow() const { return std::get<WindowPtr>(asVariant); }
     SoundPtr asSound() const { return std::get<SoundPtr>(asVariant); }
+    FormPtr asForm() const { return std::get<FormPtr>(asVariant); }
 
     bool isTruthy() const {
         if (isNil()) return false;
@@ -65,6 +70,7 @@ public:
         if (isArray()) return !asArray()->empty();
         if (isWindow()) return true;
         if (isSound()) return true;
+        if (isForm()) return true;
         return true;
     }
 
@@ -83,6 +89,7 @@ public:
         if (isString()) return asString();
         if (isWindow()) return "<window>";
         if (isSound()) return "<sound>";
+        if (isForm()) return "<form>";
         if (isArray()) {
             std::string res = "[";
             auto arr = asArray();
@@ -108,6 +115,7 @@ public:
         if (isArray()) return "array";
         if (isWindow()) return "window";
         if (isSound()) return "sound";
+        if (isForm()) return "form";
         return "unknown";
     }
 };
@@ -120,6 +128,7 @@ inline bool valuesEqual(const Value& a, const Value& b) {
     if (a.isString()) return a.asString() == b.asString();
     if (a.isWindow()) return a.asWindow() == b.asWindow();
     if (a.isSound()) return a.asSound() == b.asSound();
+    if (a.isForm()) return a.asForm() == b.asForm();
     if (a.isArray()) {
         auto arrA = a.asArray();
         auto arrB = b.asArray();

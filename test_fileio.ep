@@ -1,0 +1,42 @@
+# Test File I/O Built-ins
+
+filePath = "temp_test_file.txt"
+
+# 1. Test exists (should be false at first)
+print("Checking if", filePath, "exists initially (should be false):", exists(filePath))
+
+# 2. Test writeFile
+print("Writing initial content to", filePath)
+content1 = "Hello, EpilepsyLang!\nThis is a file I/O test.\n"
+writeFile(filePath, content1)
+
+# 3. Test exists after writing (should be true)
+print("Checking if", filePath, "exists now (should be true):", exists(filePath))
+
+# 4. Test readFile
+readContent = readFile(filePath)
+print("Read content:")
+print(readContent)
+
+# 5. Test appendFile
+print("Appending content to", filePath)
+content2 = "Appending some extra vibe-coded lines.\n"
+appendFile(filePath, content2)
+
+# 6. Test readFile after append
+readContentAfter = readFile(filePath)
+print("Read content after append:")
+print(readContentAfter)
+
+# 7. Test file:// URL cleanup logic in exists and readFile
+fileUri = "file://" + filePath
+print("Checking if file URI exists:", exists(fileUri))
+print("Reading via file URI:")
+print(readFile(fileUri))
+
+# 8. Clean up by writing empty string or just leaving it for manual inspection
+print("Cleanup: overwriting with empty file...")
+writeFile(filePath, "")
+print("Check if file still exists (should be true):", exists(filePath))
+
+print("File I/O Tests Completed successfully!")

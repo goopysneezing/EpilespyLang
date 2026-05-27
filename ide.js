@@ -289,7 +289,7 @@ const server = http.createServer(async (req, res) => {
             };
 
             const compileCmd = 'cl.exe';
-            const compileArgs = ['/Zi', '/EHsc', '/std:c++17', '/nologo', '/FeEpilespyLang.exe', 'main.cpp', 'gdi32.lib', 'user32.lib', 'wininet.lib', 'winmm.lib'];
+            const compileArgs = ['/Zi', '/EHsc', '/std:c++17', '/nologo', '/FeEpilespyLang.exe', 'main.cpp', 'gdi32.lib', 'user32.lib', 'wininet.lib', 'winmm.lib', 'opengl32.lib'];
 
             const compileProcess = spawn(compileCmd, compileArgs, { cwd: __dirname });
 

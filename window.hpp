@@ -3,6 +3,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <windowsx.h>
+#include <GL/gl.h>
 #include <thread>
 #include <mutex>
 #include <string>
@@ -91,6 +92,10 @@ public:
     HBITMAP hbmFront = nullptr;
     HBITMAP hbmOldFront = nullptr;
 
+    // OpenGL resources
+    HDC hdcGL = nullptr;
+    HGLRC hglrcGL = nullptr;
+
     // Input state
     double mouseX = 0;
     double mouseY = 0;
@@ -137,6 +142,10 @@ public:
 
     void present() {
         std::lock_guard<std::recursive_mutex> lock(mtx);
+        if (is3D) {
+            if (hdcGL) SwapBuffers(hdcGL);
+            return;
+        }
         if (hdcMem != nullptr && hdcFront != nullptr) {
             BitBlt(hdcFront, 0, 0, width, height, hdcMem, 0, 0, SRCCOPY);
             invalidate();
@@ -146,6 +155,18 @@ public:
     // Drawing methods
     void clear(const std::string& colorName) {
         std::lock_guard<std::recursive_mutex> lock(mtx);
+        if (is3D) {
+            if (hglrcGL && hdcGL) {
+                wglMakeCurrent(hdcGL, hglrcGL);
+                COLORREF color = parseColor(colorName);
+                float r = GetRValue(color) / 255.0f;
+                float g = GetGValue(color) / 255.0f;
+                float b = GetBValue(color) / 255.0f;
+                glClearColor(r, g, b, 1.0f);
+                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            }
+            return;
+        }
         if (hdcMem == nullptr) return;
         COLORREF color = parseColor(colorName);
         HBRUSH brush = CreateSolidBrush(color);
@@ -157,6 +178,26 @@ public:
 
     void rect(int x, int y, int w, int h, const std::string& colorName) {
         std::lock_guard<std::recursive_mutex> lock(mtx);
+        if (is3D) {
+            if (hglrcGL && hdcGL) {
+                wglMakeCurrent(hdcGL, hglrcGL);
+                glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); glOrtho(0, width, height, 0, -1, 1);
+                glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
+                glDisable(GL_DEPTH_TEST);
+                COLORREF color = parseColor(colorName);
+                glColor3ub(GetRValue(color), GetGValue(color), GetBValue(color));
+                glBegin(GL_QUADS);
+                glVertex2i(x, y);
+                glVertex2i(x + w, y);
+                glVertex2i(x + w, y + h);
+                glVertex2i(x, y + h);
+                glEnd();
+                glEnable(GL_DEPTH_TEST);
+                glMatrixMode(GL_PROJECTION); glPopMatrix();
+                glMatrixMode(GL_MODELVIEW); glPopMatrix();
+            }
+            return;
+        }
         if (hdcMem == nullptr) return;
         COLORREF color = parseColor(colorName);
         HBRUSH brush = CreateSolidBrush(color);
@@ -168,6 +209,28 @@ public:
 
     void rectEmpty(int x, int y, int w, int h, const std::string& colorName, int thickness) {
         std::lock_guard<std::recursive_mutex> lock(mtx);
+        if (is3D) {
+            if (hglrcGL && hdcGL) {
+                wglMakeCurrent(hdcGL, hglrcGL);
+                glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); glOrtho(0, width, height, 0, -1, 1);
+                glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
+                glDisable(GL_DEPTH_TEST);
+                COLORREF color = parseColor(colorName);
+                glColor3ub(GetRValue(color), GetGValue(color), GetBValue(color));
+                glLineWidth(static_cast<GLfloat>(thickness));
+                glBegin(GL_LINE_LOOP);
+                glVertex2i(x, y);
+                glVertex2i(x + w, y);
+                glVertex2i(x + w, y + h);
+                glVertex2i(x, y + h);
+                glEnd();
+                glLineWidth(1.0f);
+                glEnable(GL_DEPTH_TEST);
+                glMatrixMode(GL_PROJECTION); glPopMatrix();
+                glMatrixMode(GL_MODELVIEW); glPopMatrix();
+            }
+            return;
+        }
         if (hdcMem == nullptr) return;
         COLORREF color = parseColor(colorName);
         HPEN pen = CreatePen(PS_SOLID, thickness, color);
@@ -184,6 +247,27 @@ public:
 
     void circle(int x, int y, int r, const std::string& colorName) {
         std::lock_guard<std::recursive_mutex> lock(mtx);
+        if (is3D) {
+            if (hglrcGL && hdcGL) {
+                wglMakeCurrent(hdcGL, hglrcGL);
+                glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); glOrtho(0, width, height, 0, -1, 1);
+                glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
+                glDisable(GL_DEPTH_TEST);
+                COLORREF color = parseColor(colorName);
+                glColor3ub(GetRValue(color), GetGValue(color), GetBValue(color));
+                glBegin(GL_TRIANGLE_FAN);
+                glVertex2i(x, y);
+                for (int i = 0; i <= 36; ++i) {
+                    double angle = i * 2 * 3.1415926535 / 36.0;
+                    glVertex2d(x + r * std::cos(angle), y + r * std::sin(angle));
+                }
+                glEnd();
+                glEnable(GL_DEPTH_TEST);
+                glMatrixMode(GL_PROJECTION); glPopMatrix();
+                glMatrixMode(GL_MODELVIEW); glPopMatrix();
+            }
+            return;
+        }
         if (hdcMem == nullptr) return;
         COLORREF color = parseColor(colorName);
         HBRUSH brush = CreateSolidBrush(color);
@@ -202,6 +286,28 @@ public:
 
     void circleEmpty(int x, int y, int r, const std::string& colorName, int thickness) {
         std::lock_guard<std::recursive_mutex> lock(mtx);
+        if (is3D) {
+            if (hglrcGL && hdcGL) {
+                wglMakeCurrent(hdcGL, hglrcGL);
+                glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); glOrtho(0, width, height, 0, -1, 1);
+                glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
+                glDisable(GL_DEPTH_TEST);
+                COLORREF color = parseColor(colorName);
+                glColor3ub(GetRValue(color), GetGValue(color), GetBValue(color));
+                glLineWidth(static_cast<GLfloat>(thickness));
+                glBegin(GL_LINE_LOOP);
+                for (int i = 0; i < 36; ++i) {
+                    double angle = i * 2 * 3.1415926535 / 36.0;
+                    glVertex2d(x + r * std::cos(angle), y + r * std::sin(angle));
+                }
+                glEnd();
+                glLineWidth(1.0f);
+                glEnable(GL_DEPTH_TEST);
+                glMatrixMode(GL_PROJECTION); glPopMatrix();
+                glMatrixMode(GL_MODELVIEW); glPopMatrix();
+            }
+            return;
+        }
         if (hdcMem == nullptr) return;
         COLORREF color = parseColor(colorName);
         HPEN pen = CreatePen(PS_SOLID, thickness, color);
@@ -218,6 +324,27 @@ public:
 
     void ellipse(int x, int y, int rx, int ry, const std::string& colorName) {
         std::lock_guard<std::recursive_mutex> lock(mtx);
+        if (is3D) {
+            if (hglrcGL && hdcGL) {
+                wglMakeCurrent(hdcGL, hglrcGL);
+                glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); glOrtho(0, width, height, 0, -1, 1);
+                glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
+                glDisable(GL_DEPTH_TEST);
+                COLORREF color = parseColor(colorName);
+                glColor3ub(GetRValue(color), GetGValue(color), GetBValue(color));
+                glBegin(GL_TRIANGLE_FAN);
+                glVertex2i(x, y);
+                for (int i = 0; i <= 36; ++i) {
+                    double angle = i * 2 * 3.1415926535 / 36.0;
+                    glVertex2d(x + rx * std::cos(angle), y + ry * std::sin(angle));
+                }
+                glEnd();
+                glEnable(GL_DEPTH_TEST);
+                glMatrixMode(GL_PROJECTION); glPopMatrix();
+                glMatrixMode(GL_MODELVIEW); glPopMatrix();
+            }
+            return;
+        }
         if (hdcMem == nullptr) return;
         COLORREF color = parseColor(colorName);
         HBRUSH brush = CreateSolidBrush(color);
@@ -236,6 +363,26 @@ public:
 
     void line(int x1, int y1, int x2, int y2, const std::string& colorName, int thickness) {
         std::lock_guard<std::recursive_mutex> lock(mtx);
+        if (is3D) {
+            if (hglrcGL && hdcGL) {
+                wglMakeCurrent(hdcGL, hglrcGL);
+                glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); glOrtho(0, width, height, 0, -1, 1);
+                glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
+                glDisable(GL_DEPTH_TEST);
+                COLORREF color = parseColor(colorName);
+                glColor3ub(GetRValue(color), GetGValue(color), GetBValue(color));
+                glLineWidth(static_cast<GLfloat>(thickness));
+                glBegin(GL_LINES);
+                glVertex2i(x1, y1);
+                glVertex2i(x2, y2);
+                glEnd();
+                glLineWidth(1.0f);
+                glEnable(GL_DEPTH_TEST);
+                glMatrixMode(GL_PROJECTION); glPopMatrix();
+                glMatrixMode(GL_MODELVIEW); glPopMatrix();
+            }
+            return;
+        }
         if (hdcMem == nullptr) return;
         COLORREF color = parseColor(colorName);
         HPEN pen = CreatePen(PS_SOLID, thickness, color);
@@ -251,6 +398,38 @@ public:
 
     void text(int x, int y, const std::string& content, const std::string& colorName, int size) {
         std::lock_guard<std::recursive_mutex> lock(mtx);
+        if (is3D) {
+            if (hglrcGL && hdcGL) {
+                wglMakeCurrent(hdcGL, hglrcGL);
+                glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); glOrtho(0, width, height, 0, -1, 1);
+                glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
+                glDisable(GL_DEPTH_TEST);
+                COLORREF color = parseColor(colorName);
+                glColor3ub(GetRValue(color), GetGValue(color), GetBValue(color));
+                glRasterPos2i(x, y + size - 2);
+
+                HFONT font = CreateFontA(
+                    size, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+                    DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                    DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE, "Arial"
+                );
+                HFONT oldFont = (HFONT)SelectObject(hdcGL, font);
+
+                GLuint listBase = glGenLists(96);
+                wglUseFontBitmapsA(hdcGL, 32, 96, listBase);
+                glListBase(listBase - 32);
+                glCallLists(static_cast<GLsizei>(content.length()), GL_UNSIGNED_BYTE, content.c_str());
+
+                glDeleteLists(listBase, 96);
+                SelectObject(hdcGL, oldFont);
+                DeleteObject(font);
+
+                glEnable(GL_DEPTH_TEST);
+                glMatrixMode(GL_PROJECTION); glPopMatrix();
+                glMatrixMode(GL_MODELVIEW); glPopMatrix();
+            }
+            return;
+        }
         if (hdcMem == nullptr) return;
         COLORREF color = parseColor(colorName);
         
@@ -273,6 +452,23 @@ public:
 
     void pixel(int x, int y, const std::string& colorName) {
         std::lock_guard<std::recursive_mutex> lock(mtx);
+        if (is3D) {
+            if (hglrcGL && hdcGL) {
+                wglMakeCurrent(hdcGL, hglrcGL);
+                glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); glOrtho(0, width, height, 0, -1, 1);
+                glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
+                glDisable(GL_DEPTH_TEST);
+                COLORREF color = parseColor(colorName);
+                glColor3ub(GetRValue(color), GetGValue(color), GetBValue(color));
+                glBegin(GL_POINTS);
+                glVertex2i(x, y);
+                glEnd();
+                glEnable(GL_DEPTH_TEST);
+                glMatrixMode(GL_PROJECTION); glPopMatrix();
+                glMatrixMode(GL_MODELVIEW); glPopMatrix();
+            }
+            return;
+        }
         if (hdcMem == nullptr) return;
         COLORREF color = parseColor(colorName);
         SetPixel(hdcMem, x, y, color);
@@ -385,6 +581,90 @@ public:
 
     void render3D() {
         std::lock_guard<std::recursive_mutex> lock(mtx);
+        if (is3D) {
+            if (!hglrcGL || !hdcGL) return;
+
+            wglMakeCurrent(hdcGL, hglrcGL);
+
+            // Set viewport
+            glViewport(0, 0, width, height);
+
+            // Set projection matrix
+            glMatrixMode(GL_PROJECTION);
+            glLoadIdentity();
+            double aspect = (double)width / (double)height;
+            double fovY = 45.0; // 45 degrees
+            double zNear = 0.1;
+            double zFar = 1000.0;
+            double f = 1.0 / std::tan(fovY * 3.1415926535 / 360.0);
+            double m[16] = {
+                f / aspect, 0, 0, 0,
+                0, f, 0, 0,
+                0, 0, (zFar + zNear) / (zNear - zFar), -1,
+                0, 0, (2.0 * zFar * zNear) / (zNear - zFar), 0
+            };
+            glLoadMatrixd(m);
+
+            // Set modelview matrix
+            glMatrixMode(GL_MODELVIEW);
+            glLoadIdentity();
+            glScaled(1.0, 1.0, -1.0); // Make +Z go forward
+
+            glRotated(-camPitch * 180.0 / 3.1415926535, 1, 0, 0);
+            glRotated(camYaw * 180.0 / 3.1415926535, 0, 1, 0);
+            glTranslated(-camX, -camY, -camZ);
+
+            // Enable depth test
+            glEnable(GL_DEPTH_TEST);
+            glDepthFunc(GL_LEQUAL);
+
+            // Draw objects
+            for (const auto& obj : objects3D) {
+                glPushMatrix();
+                glTranslated(obj.px, obj.py, obj.pz);
+                glRotated(obj.rx * 180.0 / 3.1415926535, 1, 0, 0);
+                glRotated(obj.ry * 180.0 / 3.1415926535, 0, 1, 0);
+                glRotated(obj.rz * 180.0 / 3.1415926535, 0, 0, 1);
+                glScaled(obj.scaleX, obj.scaleY, obj.scaleZ);
+
+                if (obj.type == "cube") {
+                    for (const auto& face : obj.faces) {
+                        COLORREF color = parseColor(face.color);
+                        float r = GetRValue(color) / 255.0f;
+                        float g = GetGValue(color) / 255.0f;
+                        float b = GetBValue(color) / 255.0f;
+
+                        glBegin(GL_QUADS);
+                        glColor3f(r, g, b);
+                        for (int i = 0; i < face.numVertices; ++i) {
+                            const auto& v = obj.vertices[face.indices[i]];
+                            glVertex3d(v.x, v.y, v.z);
+                        }
+                        glEnd();
+                    }
+                } else if (obj.type == "grid") {
+                    for (const auto& face : obj.faces) {
+                        COLORREF color = parseColor(face.color);
+                        float r = GetRValue(color) / 255.0f;
+                        float g = GetGValue(color) / 255.0f;
+                        float b = GetBValue(color) / 255.0f;
+
+                        glBegin(GL_LINES);
+                        glColor3f(r, g, b);
+                        const auto& v1 = obj.vertices[face.indices[0]];
+                        const auto& v2 = obj.vertices[face.indices[1]];
+                        glVertex3d(v1.x, v1.y, v1.z);
+                        glVertex3d(v2.x, v2.y, v2.z);
+                        glEnd();
+                    }
+                }
+
+                glPopMatrix();
+            }
+
+            present();
+            return;
+        }
         if (hdcMem == nullptr) return;
 
         struct RenderTask {
@@ -721,7 +1001,9 @@ private:
                     HDC hdc = BeginPaint(hwnd, &ps);
                     {
                         std::lock_guard<std::recursive_mutex> lock(self->mtx);
-                        if (self->hdcFront != nullptr) {
+                        if (self->is3D) {
+                            if (self->hdcGL) SwapBuffers(self->hdcGL);
+                        } else if (self->hdcFront != nullptr) {
                             BitBlt(hdc, 0, 0, self->width, self->height, self->hdcFront, 0, 0, SRCCOPY);
                         }
                     }
@@ -778,6 +1060,7 @@ private:
         HINSTANCE hInst = GetModuleHandle(NULL);
         
         WNDCLASSW wc = {};
+        wc.style = CS_OWNDC;
         wc.lpfnWndProc = &WindowInstance::wndProc;
         wc.hInstance = hInst;
         wc.lpszClassName = L"EpilespyLangWindowClass";
@@ -809,8 +1092,29 @@ private:
             return;
         }
 
-        HDC hdcScreen = GetDC(tempHwnd);
         {
+            std::lock_guard<std::recursive_mutex> lock(mtx);
+            hdcGL = GetDC(tempHwnd);
+            if (is3D) {
+                PIXELFORMATDESCRIPTOR pfd = {};
+                pfd.nSize = sizeof(pfd);
+                pfd.nVersion = 1;
+                pfd.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
+                pfd.iPixelType = PFD_TYPE_RGBA;
+                pfd.cColorBits = 32;
+                pfd.cDepthBits = 24;
+                pfd.iLayerType = PFD_MAIN_PLANE;
+
+                int format = ChoosePixelFormat(hdcGL, &pfd);
+                if (format != 0) {
+                    SetPixelFormat(hdcGL, format, &pfd);
+                    hglrcGL = wglCreateContext(hdcGL);
+                }
+            }
+        }
+
+        if (!is3D) {
+            HDC hdcScreen = GetDC(tempHwnd);
             std::lock_guard<std::recursive_mutex> lock(mtx);
             hdcMem = CreateCompatibleDC(hdcScreen);
             hbmMem = CreateCompatibleBitmap(hdcScreen, width, height);
@@ -825,8 +1129,8 @@ private:
             FillRect(hdcMem, &clientRect, brush);
             FillRect(hdcFront, &clientRect, brush);
             DeleteObject(brush);
+            ReleaseDC(tempHwnd, hdcScreen);
         }
-        ReleaseDC(tempHwnd, hdcScreen);
 
         ShowWindow(tempHwnd, SW_SHOW);
         UpdateWindow(tempHwnd);
@@ -851,6 +1155,303 @@ private:
                 DeleteDC(hdcFront);
                 hdcFront = nullptr;
             }
+            if (hglrcGL != nullptr) {
+                wglMakeCurrent(NULL, NULL);
+                wglDeleteContext(hglrcGL);
+                hglrcGL = nullptr;
+            }
+            if (hdcGL != nullptr) {
+                ReleaseDC(tempHwnd, hdcGL);
+                hdcGL = nullptr;
+            }
+            hwnd = nullptr;
+            isWindowOpen = false;
+        }
+    }
+};
+
+#define WM_USER_CREATE_CONTROL (WM_USER + 101)
+
+struct FormControl {
+    std::string name;
+    std::string type; // "button", "label", "textbox", "checkbox"
+    HWND hwndControl = nullptr;
+    bool clicked = false;
+    int id = 0;
+};
+
+struct CreateControlData {
+    std::string name;
+    std::string type;
+    std::string text;
+    int x, y, w, h;
+    int id;
+    HWND hwndParent;
+    HWND hwndResult = nullptr;
+};
+
+class FormInstance {
+public:
+    HWND hwnd = nullptr;
+    std::thread winThread;
+    std::recursive_mutex mtx;
+    bool isWindowOpen = false;
+    int width = 0;
+    int height = 0;
+    std::string title;
+    
+    std::unordered_map<std::string, FormControl> controls;
+    std::unordered_map<int, std::string> controlIdToName;
+    int nextControlId = 1000;
+
+    FormInstance(const std::string& title, int w, int h)
+        : title(title), width(w), height(h) {
+        isWindowOpen = true;
+        winThread = std::thread(&FormInstance::run, this);
+
+        // Wait until HWND is created
+        while (hwnd == nullptr && isWindowOpen) {
+            std::this_thread::yield();
+        }
+    }
+
+    ~FormInstance() {
+        close();
+        if (winThread.joinable()) {
+            winThread.join();
+        }
+    }
+
+    void close() {
+        if (hwnd != nullptr) {
+            PostMessage(hwnd, WM_CLOSE, 0, 0);
+        }
+    }
+
+    bool isOpen() {
+        std::lock_guard<std::recursive_mutex> lock(mtx);
+        return isWindowOpen;
+    }
+
+    void addButton(const std::string& name, const std::string& text, int x, int y, int w, int h) {
+        std::lock_guard<std::recursive_mutex> lock(mtx);
+        if (controls.find(name) != controls.end()) return;
+        int id = nextControlId++;
+        HWND ctrlHwnd = createControlOnGuiThread(name, "button", text, x, y, w, h, id);
+        
+        FormControl ctrl = { name, "button", ctrlHwnd, false, id };
+        controls[name] = ctrl;
+        controlIdToName[id] = name;
+    }
+
+    void addLabel(const std::string& name, const std::string& text, int x, int y, int w, int h) {
+        std::lock_guard<std::recursive_mutex> lock(mtx);
+        if (controls.find(name) != controls.end()) return;
+        int id = nextControlId++;
+        HWND ctrlHwnd = createControlOnGuiThread(name, "label", text, x, y, w, h, id);
+        
+        FormControl ctrl = { name, "label", ctrlHwnd, false, id };
+        controls[name] = ctrl;
+        controlIdToName[id] = name;
+    }
+
+    void addTextBox(const std::string& name, const std::string& text, int x, int y, int w, int h) {
+        std::lock_guard<std::recursive_mutex> lock(mtx);
+        if (controls.find(name) != controls.end()) return;
+        int id = nextControlId++;
+        HWND ctrlHwnd = createControlOnGuiThread(name, "textbox", text, x, y, w, h, id);
+        
+        FormControl ctrl = { name, "textbox", ctrlHwnd, false, id };
+        controls[name] = ctrl;
+        controlIdToName[id] = name;
+    }
+
+    void addCheckBox(const std::string& name, const std::string& text, int x, int y, int w, int h) {
+        std::lock_guard<std::recursive_mutex> lock(mtx);
+        if (controls.find(name) != controls.end()) return;
+        int id = nextControlId++;
+        HWND ctrlHwnd = createControlOnGuiThread(name, "checkbox", text, x, y, w, h, id);
+        
+        FormControl ctrl = { name, "checkbox", ctrlHwnd, false, id };
+        controls[name] = ctrl;
+        controlIdToName[id] = name;
+    }
+
+    bool clicked(const std::string& name) {
+        std::lock_guard<std::recursive_mutex> lock(mtx);
+        auto it = controls.find(name);
+        if (it != controls.end() && it->second.type == "button") {
+            bool wasClicked = it->second.clicked;
+            it->second.clicked = false; // Reset the clicked state on read
+            return wasClicked;
+        }
+        return false;
+    }
+
+    std::string get(const std::string& name) {
+        std::lock_guard<std::recursive_mutex> lock(mtx);
+        auto it = controls.find(name);
+        if (it != controls.end()) {
+            if (it->second.type == "textbox" || it->second.type == "label" || it->second.type == "button") {
+                int len = GetWindowTextLengthA(it->second.hwndControl);
+                std::string buf(len + 1, '\0');
+                int actual = GetWindowTextA(it->second.hwndControl, &buf[0], len + 1);
+                buf.resize(actual);
+                return buf;
+            } else if (it->second.type == "checkbox") {
+                LRESULT state = SendMessage(it->second.hwndControl, BM_GETCHECK, 0, 0);
+                return (state == BST_CHECKED) ? "true" : "false";
+            }
+        }
+        return "";
+    }
+
+    void set(const std::string& name, const std::string& text) {
+        std::lock_guard<std::recursive_mutex> lock(mtx);
+        auto it = controls.find(name);
+        if (it != controls.end()) {
+            if (it->second.type == "textbox" || it->second.type == "label" || it->second.type == "button") {
+                SetWindowTextA(it->second.hwndControl, text.c_str());
+            } else if (it->second.type == "checkbox") {
+                WPARAM checkState = (text == "true" || text == "1") ? BST_CHECKED : BST_UNCHECKED;
+                SendMessage(it->second.hwndControl, BM_SETCHECK, checkState, 0);
+            }
+        }
+    }
+
+private:
+    HWND createControlOnGuiThread(const std::string& name, const std::string& type, const std::string& text, int x, int y, int w, int h, int id) {
+        CreateControlData data = { name, type, text, x, y, w, h, id, hwnd };
+        SendMessage(hwnd, WM_USER_CREATE_CONTROL, 0, (LPARAM)&data);
+        return data.hwndResult;
+    }
+
+    static LRESULT CALLBACK wndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+        FormInstance* self = nullptr;
+        if (msg == WM_NCCREATE) {
+            CREATESTRUCT* cs = (CREATESTRUCT*)lParam;
+            self = (FormInstance*)cs->lpCreateParams;
+            SetWindowLongPtr(hwnd, GWLP_USERDATA, (LONG_PTR)self);
+            self->hwnd = hwnd;
+        } else {
+            self = (FormInstance*)GetWindowLongPtr(hwnd, GWLP_USERDATA);
+        }
+
+        if (self != nullptr) {
+            switch (msg) {
+                case WM_USER_CREATE_CONTROL: {
+                    CreateControlData* data = (CreateControlData*)lParam;
+                    DWORD dwStyle = WS_CHILD | WS_VISIBLE;
+                    const char* className = "";
+                    
+                    if (data->type == "button") {
+                        className = "BUTTON";
+                        dwStyle |= BS_PUSHBUTTON;
+                    } else if (data->type == "label") {
+                        className = "STATIC";
+                        dwStyle |= SS_LEFT;
+                    } else if (data->type == "textbox") {
+                        className = "EDIT";
+                        dwStyle |= ES_LEFT | ES_AUTOHSCROLL | WS_BORDER;
+                    } else if (data->type == "checkbox") {
+                        className = "BUTTON";
+                        dwStyle |= BS_AUTOCHECKBOX;
+                    }
+
+                    HWND ctrlHwnd = CreateWindowExA(
+                        0, className, data->text.c_str(),
+                        dwStyle,
+                        data->x, data->y, data->w, data->h,
+                        data->hwndParent, (HMENU)(INT_PTR)data->id,
+                        GetModuleHandle(NULL), NULL
+                    );
+
+                    HFONT hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
+                    SendMessage(ctrlHwnd, WM_SETFONT, (WPARAM)hFont, TRUE);
+
+                    data->hwndResult = ctrlHwnd;
+                    return TRUE;
+                }
+                case WM_COMMAND: {
+                    int id = LOWORD(wParam);
+                    int code = HIWORD(wParam);
+                    std::lock_guard<std::recursive_mutex> lock(self->mtx);
+                    auto itName = self->controlIdToName.find(id);
+                    if (itName != self->controlIdToName.end()) {
+                        std::string name = itName->second;
+                        auto itCtrl = self->controls.find(name);
+                        if (itCtrl != self->controls.end()) {
+                            if (itCtrl->second.type == "button" && code == BN_CLICKED) {
+                                itCtrl->second.clicked = true;
+                            }
+                        }
+                    }
+                    return 0;
+                }
+                case WM_CLOSE: {
+                    DestroyWindow(hwnd);
+                    return 0;
+                }
+                case WM_DESTROY: {
+                    std::lock_guard<std::recursive_mutex> lock(self->mtx);
+                    self->isWindowOpen = false;
+                    PostQuitMessage(0);
+                    return 0;
+                }
+            }
+        }
+
+        return DefWindowProc(hwnd, msg, wParam, lParam);
+    }
+
+    void run() {
+        HINSTANCE hInst = GetModuleHandle(NULL);
+        
+        WNDCLASSW wc = {};
+        wc.lpfnWndProc = &FormInstance::wndProc;
+        wc.hInstance = hInst;
+        wc.lpszClassName = L"EpilespyLangFormClass";
+        wc.hbrBackground = (HBRUSH)(COLOR_BTNFACE + 1); // standard Windows forms dialog background
+        wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+
+        RegisterClassW(&wc);
+
+        RECT r = {0, 0, width, height};
+        AdjustWindowRect(&r, WS_OVERLAPPEDWINDOW & ~WS_THICKFRAME & ~WS_MAXIMIZEBOX, false);
+        int w = r.right - r.left;
+        int h = r.bottom - r.top;
+
+        std::wstring wtitle(title.begin(), title.end());
+
+        HWND tempHwnd = CreateWindowExW(
+            0,
+            L"EpilespyLangFormClass",
+            wtitle.c_str(),
+            WS_OVERLAPPEDWINDOW & ~WS_THICKFRAME & ~WS_MAXIMIZEBOX,
+            CW_USEDEFAULT, CW_USEDEFAULT,
+            w, h,
+            NULL, NULL, hInst, this
+        );
+
+        if (!tempHwnd) {
+            std::lock_guard<std::recursive_mutex> lock(mtx);
+            isWindowOpen = false;
+            return;
+        }
+
+        ShowWindow(tempHwnd, SW_SHOW);
+        UpdateWindow(tempHwnd);
+
+        MSG msg;
+        while (GetMessage(&msg, NULL, 0, 0)) {
+            if (!IsDialogMessage(tempHwnd, &msg)) {
+                TranslateMessage(&msg);
+                DispatchMessage(&msg);
+            }
+        }
+
+        {
+            std::lock_guard<std::recursive_mutex> lock(mtx);
             hwnd = nullptr;
             isWindowOpen = false;
         }

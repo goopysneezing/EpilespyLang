@@ -1,0 +1,46 @@
+# Test Windows Forms UI in EpilepsyLang
+
+print("Opening UI Form window...")
+win = form("EpilepsyLang Forms UI Test", 420, 320)
+
+# Add controls (name, text, x, y, width, height)
+win.addLabel("lbl_title", "Enter some text below:", 20, 20, 380, 25)
+win.addTextBox("txt_input", "Forms are cool!", 20, 50, 365, 25)
+
+win.addCheckBox("chk_upper", "Convert input to uppercase", 20, 90, 380, 25)
+win.addCheckBox("chk_beep", "Beep on click", 20, 120, 380, 25)
+
+win.addButton("btn_submit", "Process Text", 20, 160, 150, 35)
+
+win.addLabel("lbl_result_hdr", "Result:", 20, 210, 380, 20)
+win.addLabel("lbl_result", "Press the button to process your text.", 20, 235, 380, 45)
+
+clickCount = 0
+
+while (win.isOpen()) {
+    if (win.clicked("btn_submit")) {
+        clickCount = clickCount + 1
+        
+        # Read textbox text
+        inputText = win.get("txt_input")
+        
+        # Read checkbox states (which return string "true" or "false")
+        toUpper = win.get("chk_upper")
+        shouldBeep = win.get("chk_beep")
+        
+        if (toUpper == "true") {
+            inputText = upper(inputText)
+        }
+        
+        # Update result label
+        msg = "Processed text: [" + inputText + "] (Click #" + str(clickCount) + ")"
+        win.set("lbl_result", msg)
+        
+        if (shouldBeep == "true") {
+            beep(1200, 150)
+        }
+    }
+    sleep(20)
+}
+
+print("Form window closed.")

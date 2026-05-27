@@ -15,6 +15,52 @@
 #include <wininet.h>
 #include <fstream>
 #include <sstream>
+#include <filesystem>
+
+inline std::string cleanFilePath(const std::string& path) {
+    std::string clean = path;
+    if (clean.rfind("file://", 0) == 0) {
+        clean = clean.substr(7);
+        // On Windows, file:///C:/path might have a leading slash
+        if (clean.length() >= 3 && clean[0] == '/' && clean[2] == ':') {
+            clean = clean.substr(1);
+        }
+    }
+    return clean;
+}
+
+inline std::string readTextFile(const std::string& path) {
+    std::string clean = cleanFilePath(path);
+    std::ifstream file(clean);
+    if (!file.is_open()) {
+        throw std::runtime_error("Could not open file for reading: " + clean);
+    }
+    std::stringstream ss;
+    ss << file.rdbuf();
+    return ss.str();
+}
+
+inline void writeTextFile(const std::string& path, const std::string& content) {
+    std::string clean = cleanFilePath(path);
+    std::ofstream file(clean, std::ios::trunc);
+    if (!file.is_open()) {
+        throw std::runtime_error("Could not open file for writing: " + clean);
+    }
+    file << content;
+}
+
+inline void appendTextFile(const std::string& path, const std::string& content) {
+    std::string clean = cleanFilePath(path);
+    std::ofstream file(clean, std::ios::app);
+    if (!file.is_open()) {
+        throw std::runtime_error("Could not open file for appending: " + clean);
+    }
+    file << content;
+}
+
+inline bool fileOrDirExists(const std::string& path) {
+    return std::filesystem::exists(cleanFilePath(path));
+}
 
 inline std::string fetchURL(const std::string& url) {
     HINTERNET hInternet = InternetOpenA("EpilespyLangUserAgent", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
@@ -700,6 +746,74 @@ public:
                 throw RuntimeError(expr->callee.line, e.what());
             }
         }
+        if (calleeName == "form") {
+            if (args.size() != 3) {
+                throw RuntimeError(expr->callee.line, "form() expects exactly 3 arguments (title, width, height).");
+            }
+            if (!args[0].isString() || !args[1].isNumber() || !args[2].isNumber()) {
+                throw RuntimeError(expr->callee.line, "form() arguments must be (string, number, number).");
+            }
+            std::string title = args[0].asString();
+            int w = static_cast<int>(args[1].asNumber());
+            int h = static_cast<int>(args[2].asNumber());
+            
+            auto frm = std::make_shared<FormInstance>(title, w, h);
+            return Value(frm);
+        }
+        if (calleeName == "readFile") {
+            if (args.size() != 1) {
+                throw RuntimeError(expr->callee.line, "readFile() expects exactly 1 argument (path).");
+            }
+            if (!args[0].isString()) {
+                throw RuntimeError(expr->callee.line, "readFile() argument must be a string.");
+            }
+            try {
+                return Value(readTextFile(args[0].asString()));
+            } catch (const std::exception& e) {
+                throw RuntimeError(expr->callee.line, e.what());
+            }
+        }
+        if (calleeName == "writeFile") {
+            if (args.size() != 2) {
+                throw RuntimeError(expr->callee.line, "writeFile() expects exactly 2 arguments (path, content).");
+            }
+            if (!args[0].isString()) {
+                throw RuntimeError(expr->callee.line, "writeFile() path argument must be a string.");
+            }
+            try {
+                writeTextFile(args[0].asString(), args[1].toString());
+                return Value();
+            } catch (const std::exception& e) {
+                throw RuntimeError(expr->callee.line, e.what());
+            }
+        }
+        if (calleeName == "appendFile") {
+            if (args.size() != 2) {
+                throw RuntimeError(expr->callee.line, "appendFile() expects exactly 2 arguments (path, content).");
+            }
+            if (!args[0].isString()) {
+                throw RuntimeError(expr->callee.line, "appendFile() path argument must be a string.");
+            }
+            try {
+                appendTextFile(args[0].asString(), args[1].toString());
+                return Value();
+            } catch (const std::exception& e) {
+                throw RuntimeError(expr->callee.line, e.what());
+            }
+        }
+        if (calleeName == "exists") {
+            if (args.size() != 1) {
+                throw RuntimeError(expr->callee.line, "exists() expects exactly 1 argument (path).");
+            }
+            if (!args[0].isString()) {
+                throw RuntimeError(expr->callee.line, "exists() argument must be a string.");
+            }
+            try {
+                return Value(fileOrDirExists(args[0].asString()));
+            } catch (const std::exception& e) {
+                throw RuntimeError(expr->callee.line, e.what());
+            }
+        }
         if (calleeName == "substring") {
             if (args.size() != 2 && args.size() != 3) {
                 throw RuntimeError(expr->callee.line, "substring() expects 2 or 3 arguments.");
@@ -1366,9 +1480,77 @@ public:
             }
 
             throw RuntimeError(expr->method.line, "Unknown method '" + methodName + "' on sound object.");
+        } else if (obj.isForm()) {
+            auto frm = obj.asForm();
+            if (methodName == "addButton") {
+                if (args.size() != 6) throw RuntimeError(expr->method.line, "addButton() expects exactly 6 arguments (name, text, x, y, width, height).");
+                if (!args[0].isString() || !args[1].isString() || !args[2].isNumber() || !args[3].isNumber() || !args[4].isNumber() || !args[5].isNumber()) {
+                    throw RuntimeError(expr->method.line, "addButton() arguments must be (string, string, number, number, number, number).");
+                }
+                frm->addButton(args[0].asString(), args[1].asString(),
+                               static_cast<int>(args[2].asNumber()), static_cast<int>(args[3].asNumber()),
+                               static_cast<int>(args[4].asNumber()), static_cast<int>(args[5].asNumber()));
+                return obj;
+            }
+            if (methodName == "addLabel") {
+                if (args.size() != 6) throw RuntimeError(expr->method.line, "addLabel() expects exactly 6 arguments (name, text, x, y, width, height).");
+                if (!args[0].isString() || !args[1].isString() || !args[2].isNumber() || !args[3].isNumber() || !args[4].isNumber() || !args[5].isNumber()) {
+                    throw RuntimeError(expr->method.line, "addLabel() arguments must be (string, string, number, number, number, number).");
+                }
+                frm->addLabel(args[0].asString(), args[1].asString(),
+                              static_cast<int>(args[2].asNumber()), static_cast<int>(args[3].asNumber()),
+                              static_cast<int>(args[4].asNumber()), static_cast<int>(args[5].asNumber()));
+                return obj;
+            }
+            if (methodName == "addTextBox") {
+                if (args.size() != 6) throw RuntimeError(expr->method.line, "addTextBox() expects exactly 6 arguments (name, text, x, y, width, height).");
+                if (!args[0].isString() || !args[1].isString() || !args[2].isNumber() || !args[3].isNumber() || !args[4].isNumber() || !args[5].isNumber()) {
+                    throw RuntimeError(expr->method.line, "addTextBox() arguments must be (string, string, number, number, number, number).");
+                }
+                frm->addTextBox(args[0].asString(), args[1].asString(),
+                                static_cast<int>(args[2].asNumber()), static_cast<int>(args[3].asNumber()),
+                                static_cast<int>(args[4].asNumber()), static_cast<int>(args[5].asNumber()));
+                return obj;
+            }
+            if (methodName == "addCheckBox") {
+                if (args.size() != 6) throw RuntimeError(expr->method.line, "addCheckBox() expects exactly 6 arguments (name, text, x, y, width, height).");
+                if (!args[0].isString() || !args[1].isString() || !args[2].isNumber() || !args[3].isNumber() || !args[4].isNumber() || !args[5].isNumber()) {
+                    throw RuntimeError(expr->method.line, "addCheckBox() arguments must be (string, string, number, number, number, number).");
+                }
+                frm->addCheckBox(args[0].asString(), args[1].asString(),
+                                 static_cast<int>(args[2].asNumber()), static_cast<int>(args[3].asNumber()),
+                                 static_cast<int>(args[4].asNumber()), static_cast<int>(args[5].asNumber()));
+                return obj;
+            }
+            if (methodName == "clicked") {
+                if (args.size() != 1) throw RuntimeError(expr->method.line, "clicked() expects exactly 1 argument (name).");
+                if (!args[0].isString()) throw RuntimeError(expr->method.line, "clicked() argument must be a string name.");
+                return Value(frm->clicked(args[0].asString()));
+            }
+            if (methodName == "get") {
+                if (args.size() != 1) throw RuntimeError(expr->method.line, "get() expects exactly 1 argument (name).");
+                if (!args[0].isString()) throw RuntimeError(expr->method.line, "get() argument must be a string name.");
+                return Value(frm->get(args[0].asString()));
+            }
+            if (methodName == "set") {
+                if (args.size() != 2) throw RuntimeError(expr->method.line, "set() expects exactly 2 arguments (name, value).");
+                if (!args[0].isString()) throw RuntimeError(expr->method.line, "set() first argument must be a string name.");
+                frm->set(args[0].asString(), args[1].toString());
+                return obj;
+            }
+            if (methodName == "isOpen") {
+                if (args.size() != 0) throw RuntimeError(expr->method.line, "isOpen() expects 0 arguments.");
+                return Value(frm->isOpen());
+            }
+            if (methodName == "close") {
+                if (args.size() != 0) throw RuntimeError(expr->method.line, "close() expects 0 arguments.");
+                frm->close();
+                return obj;
+            }
+            throw RuntimeError(expr->method.line, "Unknown method '" + methodName + "' on form object.");
         }
 
-        throw RuntimeError(expr->method.line, "Only window and sound objects support method calls.");
+        throw RuntimeError(expr->method.line, "Only window, sound, and form objects support method calls.");
     }
 
     // StmtVisitor implementation
