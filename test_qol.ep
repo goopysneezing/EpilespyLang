@@ -1,0 +1,50 @@
+# Test QoL functions
+
+# 1. String case & trim
+s = "  Hello, EpilepsyLang!  "
+print("trim(s):", "[" + trim(s) + "]")
+print("lower(s):", "[" + lower(s) + "]")
+print("upper(s):", "[" + upper(s) + "]")
+
+# 2. Substring & Replace
+print("substring(s, 2, 5):", "[" + substring(s, 2, 5) + "]")
+print("substring(s, 9):", "[" + substring(s, 9) + "]")
+print("replace(s, 'Hello', 'Hi'):", "[" + replace(s, "Hello", "Hi") + "]")
+
+# 3. Split & Join
+arr = split(trim(s), " ")
+print("split result:", arr)
+print("join result:", join(arr, " - "))
+
+# 4. indexOf & contains (String)
+clean = trim(s)
+print("indexOf('Epilepsy', clean):", indexOf(clean, "EpilepsyLang!"))
+print("indexOf('xyz', clean):", indexOf(clean, "xyz"))
+print("contains('Epilepsy', clean):", contains(clean, "Epilepsy"))
+print("contains('xyz', clean):", contains(clean, "xyz"))
+
+# 5. indexOf & contains (Array)
+myArr = [10, 20, 30, 40]
+print("indexOf(30, myArr):", indexOf(myArr, 30))
+print("indexOf(100, myArr):", indexOf(myArr, 100))
+print("contains(20, myArr):", contains(myArr, 20))
+print("contains(50, myArr):", contains(myArr, 50))
+
+# 6. Slice (String & Array)
+print("slice(clean, 0, 5) (expected 'Hello'):", slice(clean, 0, 5))
+print("slice(clean, 7, -1) (expected 'EpilepsyLang'):", slice(clean, 7, -1))
+print("slice(myArr, 1, 3) (expected '[20, 30]'):", slice(myArr, 1, 3))
+print("slice(myArr, 1) (expected '[20, 30, 40]'):", slice(myArr, 1))
+
+# 7. Range
+print("range(5) (expected '[0, 1, 2, 3, 4]'):", range(5))
+print("range(5, 10) (expected '[5, 6, 7, 8, 9]'):", range(5, 10))
+print("range(0, 10, 2) (expected '[0, 2, 4, 6, 8]'):", range(0, 10, 2))
+print("range(10, 0, -2) (expected '[10, 8, 6, 4, 2]'):", range(10, 0, -2))
+
+# 8. Time
+t = time()
+print("Current time (timestamp in ms):", t)
+sleep(50)
+t2 = time()
+print("Time elapsed (expected >= 50ms):", t2 - t)

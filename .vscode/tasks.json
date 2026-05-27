@@ -13,7 +13,8 @@
                 "${workspaceFolder}\\main.cpp",
                 "gdi32.lib",
                 "user32.lib",
-                "wininet.lib"
+                "wininet.lib",
+                "winmm.lib"
             ],
             "options": {
                 "cwd": "${workspaceFolder}"

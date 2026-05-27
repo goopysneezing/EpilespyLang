@@ -1,0 +1,34 @@
+# Test script for loading and playing audio files
+# We can use any system WAV file from Windows (like Windows Logon or Asterisk sound)
+# Usually, C:/Windows/Media/chimes.wav or C:/Windows/Media/notify.wav exists on Windows!
+print("Loading Windows notification sound...")
+snd = sound("C:/Windows/Media/chimes.wav")
+
+print("Setting volume to 50%...")
+snd.volume(50)
+
+print("Playing chimes...")
+snd.play()
+
+# Wait 2 seconds for sound to finish
+sleep(2000)
+
+print("Playing looped chimes...")
+snd.play(true)
+
+# Let it play for 3 seconds, then pause
+sleep(3000)
+print("Pausing sound...")
+snd.pause()
+
+sleep(1500)
+print("Resuming sound...")
+snd.resume()
+
+sleep(2000)
+print("Stopping sound...")
+snd.stop()
+
+# Close the file resource
+snd.close()
+print("Sound test finished!")

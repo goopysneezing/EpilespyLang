@@ -178,6 +178,8 @@ res = (x + 10) * 2</code></pre>
                         <li><code>window(title, w, h)</code>: Standard Win32 Window</li>
                         <li><code>gameWindow3D(title, w, h)</code>: 3D Render Window</li>
                         <li><code>gameWindow2D(title, w, h)</code>: 2D Camera Window</li>
+                        <li><code>sound(filePath)</code>: Create Sound Object</li>
+                        <li><code>beep(freq, duration)</code>: Async Audio Beep</li>
                     </ul>
 
                     <h5>Math Constants</h5>
@@ -215,6 +217,10 @@ res = (x + 10) * 2</code></pre>
                         <li><code>win.setCamera2D(cx, cy, zoom)</code>: Set 2D Camera</li>
                         <li><code>win.moveCamera2D(dx, dy)</code>: Translate 2D Camera</li>
                         <li><code>win.clear2D()</code> / <code>win.render2D()</code>: Manage 2D Buffers</li>
+                        <li><code>snd.play(loop)</code>: Play Audio (loop: true/false)</li>
+                        <li><code>snd.pause()</code> / <code>snd.resume()</code>: Control Audio</li>
+                        <li><code>snd.stop()</code> / <code>snd.close()</code>: Terminate/Dispose Audio</li>
+                        <li><code>snd.volume(vol)</code>: Set Audio Volume (0-100)</li>
                     </ul>
                 </div>
             </div>
