@@ -22,6 +22,10 @@ win.setCamera(cx, cy, cz, pitch, yaw)
 speed = 0.15
 rotSpeed = 0.03
 
+firstClick = true
+lastX = 0
+lastY = 0
+
 while (win.isOpen()) {
     # Move Camera Forward/Backward (W/S or Up/Down)
     if (win.getKey("w") or win.getKey("up")) {
@@ -51,12 +55,17 @@ while (win.isOpen()) {
     if (win.getMouseLeft()) {
         mx = win.getMouseX()
         my = win.getMouseY()
-        
-        # Calculate angular rotation based on center of screen (400, 300)
-        dyaw = (mx - 400) * 0.0001
-        dpitch = (my - 300) * 0.0001
-        
-        win.rotateCamera(dpitch, dyaw)
+        if (firstClick) {
+            firstClick = false
+        } else {
+            dx = mx - lastX
+            dy = my - lastY
+            win.rotateCamera(-dy * 0.003, dx * 0.003)
+        }
+        lastX = mx
+        lastY = my
+    } else {
+        firstClick = true
     }
 
     # Draw Frame

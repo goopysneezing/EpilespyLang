@@ -1,0 +1,60 @@
+# Test new math constants
+print("tau (expected ~6.28318):", tau)
+print("sqrt2 (expected ~1.41421):", sqrt2)
+print("ln2 (expected ~0.69314):", ln2)
+print("ln10 (expected ~2.30258):", ln10)
+
+# Test hyperbolic & inverse hyperbolic functions
+print("asinh(1) (expected ~0.88137):", asinh(1))
+print("acosh(1) (expected 0):", acosh(1))
+print("acosh(2) (expected ~1.31695):", acosh(2))
+print("atanh(0.5) (expected ~0.5493):", atanh(0.5))
+
+# Test hypot
+print("hypot(3, 4) (expected 5):", hypot(3, 4))
+print("hypot(1, 2, 2) (expected 3):", hypot(1, 2, 2))
+
+# Test logarithmic & exponential
+print("ln(e) (expected 1):", ln(e))
+print("log1p(0) (expected 0):", log1p(0))
+print("log1p(e - 1) (expected 1):", log1p(e - 1))
+print("expm1(1) (expected ~1.71828):", expm1(1))
+
+# Test sign and trunc/fract
+print("copysign(5, -1) (expected -5):", copysign(5, -1))
+print("copysign(-5, 1) (expected 5):", copysign(-5, 1))
+print("sign(10) (expected 1):", sign(10))
+print("sgn(-20) (expected -1):", sgn(-20))
+print("sgn(0) (expected 0):", sgn(0))
+print("trunc(3.9) (expected 3):", trunc(3.9))
+print("trunc(-3.9) (expected -3):", trunc(-3.9))
+print("fract(3.75) (expected 0.75):", fract(3.75))
+print("fract(-3.75) (expected 0.25):", fract(-3.75))
+
+# Test special functions
+print("erf(0) (expected 0):", erf(0))
+print("erfc(0) (expected 1):", erfc(0))
+print("tgamma(5) (expected 24):", tgamma(5)) # gamma(n) = (n-1)!
+print("lgamma(5) (expected ~3.17805):", lgamma(5))
+
+# Test classification
+print("isnan(0) (expected 0):", isnan(0))
+print("isinf(100) (expected 0):", isinf(100))
+print("isfinite(5) (expected 1):", isfinite(5))
+
+# Test clamp & lerp
+print("clamp(5, 1, 10) (expected 5):", clamp(5, 1, 10))
+print("clamp(0, 1, 10) (expected 1):", clamp(0, 1, 10))
+print("clamp(12, 1, 10) (expected 10):", clamp(12, 1, 10))
+print("lerp(10, 20, 0.5) (expected 15):", lerp(10, 20, 0.5))
+
+# Test random number generation
+srand(42)
+r1 = rand()
+r2 = random()
+print("rand() with seed 42, r1:", r1)
+print("random() with seed 42, r2:", r2)
+i1 = randint(1, 100)
+i2 = randint(1, 100)
+print("randint(1, 100):", i1)
+print("randint(1, 100):", i2)

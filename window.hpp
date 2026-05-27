@@ -76,7 +76,7 @@ class WindowInstance {
 public:
     HWND hwnd = nullptr;
     std::thread winThread;
-    std::mutex mtx;
+    std::recursive_mutex mtx;
     bool isWindowOpen = false;
     int width = 0;
     int height = 0;
@@ -86,6 +86,10 @@ public:
     HDC hdcMem = nullptr;
     HBITMAP hbmMem = nullptr;
     HBITMAP hbmOld = nullptr;
+
+    HDC hdcFront = nullptr;
+    HBITMAP hbmFront = nullptr;
+    HBITMAP hbmOldFront = nullptr;
 
     // Input state
     double mouseX = 0;
@@ -127,35 +131,43 @@ public:
     }
 
     bool isOpen() {
-        std::lock_guard<std::mutex> lock(mtx);
+        std::lock_guard<std::recursive_mutex> lock(mtx);
         return isWindowOpen;
+    }
+
+    void present() {
+        std::lock_guard<std::recursive_mutex> lock(mtx);
+        if (hdcMem != nullptr && hdcFront != nullptr) {
+            BitBlt(hdcFront, 0, 0, width, height, hdcMem, 0, 0, SRCCOPY);
+            invalidate();
+        }
     }
 
     // Drawing methods
     void clear(const std::string& colorName) {
-        std::lock_guard<std::mutex> lock(mtx);
+        std::lock_guard<std::recursive_mutex> lock(mtx);
         if (hdcMem == nullptr) return;
         COLORREF color = parseColor(colorName);
         HBRUSH brush = CreateSolidBrush(color);
         RECT r = {0, 0, width, height};
         FillRect(hdcMem, &r, brush);
         DeleteObject(brush);
-        invalidate();
+        if (!is3D && !is2D) present();
     }
 
     void rect(int x, int y, int w, int h, const std::string& colorName) {
-        std::lock_guard<std::mutex> lock(mtx);
+        std::lock_guard<std::recursive_mutex> lock(mtx);
         if (hdcMem == nullptr) return;
         COLORREF color = parseColor(colorName);
         HBRUSH brush = CreateSolidBrush(color);
         RECT r = {x, y, x + w, y + h};
         FillRect(hdcMem, &r, brush);
         DeleteObject(brush);
-        invalidate();
+        if (!is3D && !is2D) present();
     }
 
     void rectEmpty(int x, int y, int w, int h, const std::string& colorName, int thickness) {
-        std::lock_guard<std::mutex> lock(mtx);
+        std::lock_guard<std::recursive_mutex> lock(mtx);
         if (hdcMem == nullptr) return;
         COLORREF color = parseColor(colorName);
         HPEN pen = CreatePen(PS_SOLID, thickness, color);
@@ -167,11 +179,11 @@ public:
         SelectObject(hdcMem, oldPen);
         SelectObject(hdcMem, oldBrush);
         DeleteObject(pen);
-        invalidate();
+        if (!is3D && !is2D) present();
     }
 
     void circle(int x, int y, int r, const std::string& colorName) {
-        std::lock_guard<std::mutex> lock(mtx);
+        std::lock_guard<std::recursive_mutex> lock(mtx);
         if (hdcMem == nullptr) return;
         COLORREF color = parseColor(colorName);
         HBRUSH brush = CreateSolidBrush(color);
@@ -185,11 +197,11 @@ public:
         SelectObject(hdcMem, oldBrush);
         DeleteObject(pen);
         DeleteObject(brush);
-        invalidate();
+        if (!is3D && !is2D) present();
     }
 
     void circleEmpty(int x, int y, int r, const std::string& colorName, int thickness) {
-        std::lock_guard<std::mutex> lock(mtx);
+        std::lock_guard<std::recursive_mutex> lock(mtx);
         if (hdcMem == nullptr) return;
         COLORREF color = parseColor(colorName);
         HPEN pen = CreatePen(PS_SOLID, thickness, color);
@@ -201,11 +213,11 @@ public:
         SelectObject(hdcMem, oldPen);
         SelectObject(hdcMem, oldBrush);
         DeleteObject(pen);
-        invalidate();
+        if (!is3D && !is2D) present();
     }
 
     void ellipse(int x, int y, int rx, int ry, const std::string& colorName) {
-        std::lock_guard<std::mutex> lock(mtx);
+        std::lock_guard<std::recursive_mutex> lock(mtx);
         if (hdcMem == nullptr) return;
         COLORREF color = parseColor(colorName);
         HBRUSH brush = CreateSolidBrush(color);
@@ -219,11 +231,11 @@ public:
         SelectObject(hdcMem, oldBrush);
         DeleteObject(pen);
         DeleteObject(brush);
-        invalidate();
+        if (!is3D && !is2D) present();
     }
 
     void line(int x1, int y1, int x2, int y2, const std::string& colorName, int thickness) {
-        std::lock_guard<std::mutex> lock(mtx);
+        std::lock_guard<std::recursive_mutex> lock(mtx);
         if (hdcMem == nullptr) return;
         COLORREF color = parseColor(colorName);
         HPEN pen = CreatePen(PS_SOLID, thickness, color);
@@ -234,11 +246,11 @@ public:
 
         SelectObject(hdcMem, oldPen);
         DeleteObject(pen);
-        invalidate();
+        if (!is3D && !is2D) present();
     }
 
     void text(int x, int y, const std::string& content, const std::string& colorName, int size) {
-        std::lock_guard<std::mutex> lock(mtx);
+        std::lock_guard<std::recursive_mutex> lock(mtx);
         if (hdcMem == nullptr) return;
         COLORREF color = parseColor(colorName);
         
@@ -256,20 +268,20 @@ public:
 
         SelectObject(hdcMem, oldFont);
         DeleteObject(font);
-        invalidate();
+        if (!is3D && !is2D) present();
     }
 
     void pixel(int x, int y, const std::string& colorName) {
-        std::lock_guard<std::mutex> lock(mtx);
+        std::lock_guard<std::recursive_mutex> lock(mtx);
         if (hdcMem == nullptr) return;
         COLORREF color = parseColor(colorName);
         SetPixel(hdcMem, x, y, color);
-        invalidate();
+        if (!is3D && !is2D) present();
     }
 
     // 3D Engine Methods
     void addCube(double x, double y, double z, double size, const std::string& colorName) {
-        std::lock_guard<std::mutex> lock(mtx);
+        std::lock_guard<std::recursive_mutex> lock(mtx);
         double s = size / 2.0;
         Object3D obj;
         obj.type = "cube";
@@ -297,7 +309,7 @@ public:
     }
 
     void addGrid(double x, double z, double size, double spacing, const std::string& colorName) {
-        std::lock_guard<std::mutex> lock(mtx);
+        std::lock_guard<std::recursive_mutex> lock(mtx);
         double halfSize = size / 2.0;
         Object3D obj;
         obj.type = "grid";
@@ -334,7 +346,7 @@ public:
     }
 
     void setCamera(double x, double y, double z, double pitch, double yaw) {
-        std::lock_guard<std::mutex> lock(mtx);
+        std::lock_guard<std::recursive_mutex> lock(mtx);
         camX = x;
         camY = y;
         camZ = z;
@@ -343,9 +355,9 @@ public:
     }
 
     void moveCamera(double forward, double right, double up) {
-        std::lock_guard<std::mutex> lock(mtx);
+        std::lock_guard<std::recursive_mutex> lock(mtx);
         double fx = std::sin(camYaw) * std::cos(camPitch);
-        double fy = -std::sin(camPitch);
+        double fy = std::sin(camPitch);
         double fz = std::cos(camYaw) * std::cos(camPitch);
 
         double rx = std::cos(camYaw);
@@ -358,7 +370,7 @@ public:
     }
 
     void rotateCamera(double dpitch, double dyaw) {
-        std::lock_guard<std::mutex> lock(mtx);
+        std::lock_guard<std::recursive_mutex> lock(mtx);
         camPitch += dpitch;
         camYaw += dyaw;
 
@@ -367,12 +379,12 @@ public:
     }
 
     void clear3D() {
-        std::lock_guard<std::mutex> lock(mtx);
+        std::lock_guard<std::recursive_mutex> lock(mtx);
         objects3D.clear();
     }
 
     void render3D() {
-        std::lock_guard<std::mutex> lock(mtx);
+        std::lock_guard<std::recursive_mutex> lock(mtx);
         if (hdcMem == nullptr) return;
 
         struct RenderTask {
@@ -387,10 +399,10 @@ public:
         double halfW = width / 2.0;
         double halfH = height / 2.0;
 
-        double cosYaw = std::cos(-camYaw);
-        double sinYaw = std::sin(-camYaw);
-        double cosPitch = std::cos(-camPitch);
-        double sinPitch = std::sin(-camPitch);
+        double cosYaw = std::cos(camYaw);
+        double sinYaw = std::sin(camYaw);
+        double cosPitch = std::cos(camPitch);
+        double sinPitch = std::sin(camPitch);
 
         for (const auto& obj : objects3D) {
             double cosRX = std::cos(obj.rx), sinRX = std::sin(obj.rx);
@@ -435,32 +447,36 @@ public:
             }
 
             for (const auto& face : obj.faces) {
-                double sumDepth = 0.0;
-                bool allBehind = true;
-                std::vector<POINT> projPoints;
-                projPoints.reserve(face.numVertices);
-
+                std::vector<Vertex3D> faceVertices;
+                faceVertices.reserve(face.numVertices);
                 for (int i = 0; i < face.numVertices; ++i) {
-                    int idx = face.indices[i];
-                    const auto& cv = camVertices[idx];
-                    sumDepth += cv.z;
-                    if (cv.z > 0.1) {
-                        allBehind = false;
-                    }
+                    faceVertices.push_back(camVertices[face.indices[i]]);
+                }
 
-                    double denom = cv.z > 0.1 ? cv.z : 0.1;
-                    int sx = static_cast<int>(halfW + (cv.x * fov / denom));
-                    int sy = static_cast<int>(halfH - (cv.y * fov / denom));
+                std::vector<Vertex3D> clipped;
+                if (face.numVertices == 2) {
+                    clipped = clipLineNearPlane(faceVertices[0], faceVertices[1]);
+                } else {
+                    clipped = clipPolygonNearPlane(faceVertices);
+                }
+
+                if (clipped.empty()) continue;
+
+                std::vector<POINT> projPoints;
+                projPoints.reserve(clipped.size());
+                double sumDepth = 0.0;
+                for (const auto& cv : clipped) {
+                    sumDepth += cv.z;
+                    int sx = static_cast<int>(halfW + (cv.x * fov / cv.z));
+                    int sy = static_cast<int>(halfH - (cv.y * fov / cv.z));
                     projPoints.push_back({sx, sy});
                 }
 
-                if (allBehind) continue;
-
                 RenderTask task;
                 task.screenPoints = projPoints;
-                task.numVertices = face.numVertices;
+                task.numVertices = static_cast<int>(projPoints.size());
                 task.colorRef = parseColor(face.color);
-                task.depth = sumDepth / face.numVertices;
+                task.depth = sumDepth / clipped.size();
                 renderTasks.push_back(task);
             }
         }
@@ -477,7 +493,7 @@ public:
                 LineTo(hdcMem, task.screenPoints[1].x, task.screenPoints[1].y);
                 SelectObject(hdcMem, oldPen);
                 DeleteObject(pen);
-            } else {
+            } else if (task.numVertices > 2) {
                 HBRUSH brush = CreateSolidBrush(task.colorRef);
                 HPEN pen = CreatePen(PS_SOLID, 1, task.colorRef);
                 HBRUSH oldBrush = (HBRUSH)SelectObject(hdcMem, brush);
@@ -492,12 +508,12 @@ public:
             }
         }
 
-        invalidate();
+        present();
     }
 
     // 2D Engine Methods
     void addRect2D(double x, double y, double w, double h, const std::string& colorName) {
-        std::lock_guard<std::mutex> lock(mtx);
+        std::lock_guard<std::recursive_mutex> lock(mtx);
         Object2D obj;
         obj.type = "rect";
         obj.x = x; obj.y = y; obj.w = w; obj.h = h; obj.r = 0;
@@ -506,7 +522,7 @@ public:
     }
 
     void addCircle2D(double x, double y, double r, const std::string& colorName) {
-        std::lock_guard<std::mutex> lock(mtx);
+        std::lock_guard<std::recursive_mutex> lock(mtx);
         Object2D obj;
         obj.type = "circle";
         obj.x = x; obj.y = y; obj.w = 0; obj.h = 0; obj.r = r;
@@ -515,25 +531,25 @@ public:
     }
 
     void setCamera2D(double cx, double cy, double zoom) {
-        std::lock_guard<std::mutex> lock(mtx);
+        std::lock_guard<std::recursive_mutex> lock(mtx);
         cam2DX = cx;
         cam2DY = cy;
         cam2DZoom = zoom;
     }
 
     void moveCamera2D(double dx, double dy) {
-        std::lock_guard<std::mutex> lock(mtx);
+        std::lock_guard<std::recursive_mutex> lock(mtx);
         cam2DX += dx;
         cam2DY += dy;
     }
 
     void clear2D() {
-        std::lock_guard<std::mutex> lock(mtx);
+        std::lock_guard<std::recursive_mutex> lock(mtx);
         objects2D.clear();
     }
 
     void render2D() {
-        std::lock_guard<std::mutex> lock(mtx);
+        std::lock_guard<std::recursive_mutex> lock(mtx);
         if (hdcMem == nullptr) return;
 
         double halfW = width / 2.0;
@@ -573,27 +589,27 @@ public:
             DeleteObject(pen);
         }
 
-        invalidate();
+        present();
     }
 
     // Input getters
     double getMouseX() {
-        std::lock_guard<std::mutex> lock(mtx);
+        std::lock_guard<std::recursive_mutex> lock(mtx);
         return mouseX;
     }
 
     double getMouseY() {
-        std::lock_guard<std::mutex> lock(mtx);
+        std::lock_guard<std::recursive_mutex> lock(mtx);
         return mouseY;
     }
 
     bool getMouseLeft() {
-        std::lock_guard<std::mutex> lock(mtx);
+        std::lock_guard<std::recursive_mutex> lock(mtx);
         return mouseLeft;
     }
 
     bool getKey(const std::string& keyName) {
-        std::lock_guard<std::mutex> lock(mtx);
+        std::lock_guard<std::recursive_mutex> lock(mtx);
         int vk = mapKeyNameToVk(keyName);
         if (vk >= 0 && vk < 256) {
             return keys[vk];
@@ -602,6 +618,55 @@ public:
     }
 
 private:
+    std::vector<Vertex3D> clipPolygonNearPlane(const std::vector<Vertex3D>& poly, double nearZ = 0.1) {
+        std::vector<Vertex3D> result;
+        if (poly.empty()) return result;
+
+        for (size_t i = 0; i < poly.size(); ++i) {
+            const Vertex3D& a = poly[i];
+            const Vertex3D& b = poly[(i + 1) % poly.size()];
+
+            bool aIn = (a.z >= nearZ);
+            bool bIn = (b.z >= nearZ);
+
+            if (aIn && bIn) {
+                result.push_back(b);
+            } else if (aIn && !bIn) {
+                double t = (nearZ - a.z) / (b.z - a.z);
+                double ix = a.x + t * (b.x - a.x);
+                double iy = a.y + t * (b.y - a.y);
+                result.push_back({ix, iy, nearZ});
+            } else if (!aIn && bIn) {
+                double t = (nearZ - a.z) / (b.z - a.z);
+                double ix = a.x + t * (b.x - a.x);
+                double iy = a.y + t * (b.y - a.y);
+                result.push_back({ix, iy, nearZ});
+                result.push_back(b);
+            }
+        }
+        return result;
+    }
+
+    std::vector<Vertex3D> clipLineNearPlane(const Vertex3D& a, const Vertex3D& b, double nearZ = 0.1) {
+        bool aIn = (a.z >= nearZ);
+        bool bIn = (b.z >= nearZ);
+
+        if (aIn && bIn) {
+            return {a, b};
+        } else if (aIn && !bIn) {
+            double t = (nearZ - a.z) / (b.z - a.z);
+            double ix = a.x + t * (b.x - a.x);
+            double iy = a.y + t * (b.y - a.y);
+            return {a, {ix, iy, nearZ}};
+        } else if (!aIn && bIn) {
+            double t = (nearZ - a.z) / (b.z - a.z);
+            double ix = a.x + t * (b.x - a.x);
+            double iy = a.y + t * (b.y - a.y);
+            return {{ix, iy, nearZ}, b};
+        }
+        return {};
+    }
+
     void invalidate() {
         if (hwnd != nullptr) {
             InvalidateRect(hwnd, NULL, false);
@@ -655,39 +720,39 @@ private:
                     PAINTSTRUCT ps;
                     HDC hdc = BeginPaint(hwnd, &ps);
                     {
-                        std::lock_guard<std::mutex> lock(self->mtx);
-                        if (self->hdcMem != nullptr) {
-                            BitBlt(hdc, 0, 0, self->width, self->height, self->hdcMem, 0, 0, SRCCOPY);
+                        std::lock_guard<std::recursive_mutex> lock(self->mtx);
+                        if (self->hdcFront != nullptr) {
+                            BitBlt(hdc, 0, 0, self->width, self->height, self->hdcFront, 0, 0, SRCCOPY);
                         }
                     }
                     EndPaint(hwnd, &ps);
                     return 0;
                 }
                 case WM_MOUSEMOVE: {
-                    std::lock_guard<std::mutex> lock(self->mtx);
+                    std::lock_guard<std::recursive_mutex> lock(self->mtx);
                     self->mouseX = GET_X_LPARAM(lParam);
                     self->mouseY = GET_Y_LPARAM(lParam);
                     return 0;
                 }
                 case WM_LBUTTONDOWN: {
-                    std::lock_guard<std::mutex> lock(self->mtx);
+                    std::lock_guard<std::recursive_mutex> lock(self->mtx);
                     self->mouseLeft = true;
                     return 0;
                 }
                 case WM_LBUTTONUP: {
-                    std::lock_guard<std::mutex> lock(self->mtx);
+                    std::lock_guard<std::recursive_mutex> lock(self->mtx);
                     self->mouseLeft = false;
                     return 0;
                 }
                 case WM_KEYDOWN: {
-                    std::lock_guard<std::mutex> lock(self->mtx);
+                    std::lock_guard<std::recursive_mutex> lock(self->mtx);
                     if (wParam >= 0 && wParam < 256) {
                         self->keys[wParam] = true;
                     }
                     return 0;
                 }
                 case WM_KEYUP: {
-                    std::lock_guard<std::mutex> lock(self->mtx);
+                    std::lock_guard<std::recursive_mutex> lock(self->mtx);
                     if (wParam >= 0 && wParam < 256) {
                         self->keys[wParam] = false;
                     }
@@ -698,7 +763,7 @@ private:
                     return 0;
                 }
                 case WM_DESTROY: {
-                    std::lock_guard<std::mutex> lock(self->mtx);
+                    std::lock_guard<std::recursive_mutex> lock(self->mtx);
                     self->isWindowOpen = false;
                     PostQuitMessage(0);
                     return 0;
@@ -739,21 +804,26 @@ private:
         );
 
         if (!tempHwnd) {
-            std::lock_guard<std::mutex> lock(mtx);
+            std::lock_guard<std::recursive_mutex> lock(mtx);
             isWindowOpen = false;
             return;
         }
 
         HDC hdcScreen = GetDC(tempHwnd);
         {
-            std::lock_guard<std::mutex> lock(mtx);
+            std::lock_guard<std::recursive_mutex> lock(mtx);
             hdcMem = CreateCompatibleDC(hdcScreen);
             hbmMem = CreateCompatibleBitmap(hdcScreen, width, height);
             hbmOld = (HBITMAP)SelectObject(hdcMem, hbmMem);
 
+            hdcFront = CreateCompatibleDC(hdcScreen);
+            hbmFront = CreateCompatibleBitmap(hdcScreen, width, height);
+            hbmOldFront = (HBITMAP)SelectObject(hdcFront, hbmFront);
+
             HBRUSH brush = CreateSolidBrush(RGB(0, 0, 0));
             RECT clientRect = {0, 0, width, height};
             FillRect(hdcMem, &clientRect, brush);
+            FillRect(hdcFront, &clientRect, brush);
             DeleteObject(brush);
         }
         ReleaseDC(tempHwnd, hdcScreen);
@@ -768,12 +838,18 @@ private:
         }
 
         {
-            std::lock_guard<std::mutex> lock(mtx);
+            std::lock_guard<std::recursive_mutex> lock(mtx);
             if (hdcMem != nullptr) {
                 SelectObject(hdcMem, hbmOld);
                 DeleteObject(hbmMem);
                 DeleteDC(hdcMem);
                 hdcMem = nullptr;
+            }
+            if (hdcFront != nullptr) {
+                SelectObject(hdcFront, hbmOldFront);
+                DeleteObject(hbmFront);
+                DeleteDC(hdcFront);
+                hdcFront = nullptr;
             }
             hwnd = nullptr;
             isWindowOpen = false;

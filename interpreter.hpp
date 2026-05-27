@@ -4,6 +4,8 @@
 #include <memory>
 #include <string>
 #include <cmath>
+#include <random>
+#include <algorithm>
 #include <thread>
 #include <chrono>
 #include "ast.hpp"
@@ -59,6 +61,7 @@ class Interpreter : public ExprVisitor, public StmtVisitor {
 private:
     std::shared_ptr<Environment> environment = std::make_shared<Environment>();
     bool epilepsyState = false;
+    std::mt19937 rng{static_cast<unsigned int>(std::chrono::system_clock::now().time_since_epoch().count())};
 
     void checkNumberOperands(Token op, const Value& left, const Value& right) {
         if (left.isNumber() && right.isNumber()) return;
@@ -69,6 +72,10 @@ public:
     Interpreter() {
         environment->define("pi", Value(3.14159265358979323846));
         environment->define("e", Value(2.71828182845904523536));
+        environment->define("tau", Value(6.28318530717958647692));
+        environment->define("sqrt2", Value(1.41421356237309504880));
+        environment->define("ln2", Value(0.693147180559945309417));
+        environment->define("ln10", Value(2.30258509299404568402));
     }
 
     std::shared_ptr<Environment> getGlobals() const {
@@ -519,6 +526,153 @@ public:
         if (calleeName == "rad2deg") {
             checkNumArgs("rad2deg", 1);
             return Value(args[0].asNumber() * 180.0 / 3.14159265358979323846);
+        }
+        if (calleeName == "asinh") {
+            checkNumArgs("asinh", 1);
+            return Value(std::asinh(args[0].asNumber()));
+        }
+        if (calleeName == "acosh") {
+            checkNumArgs("acosh", 1);
+            double val = args[0].asNumber();
+            if (val < 1.0) {
+                throw RuntimeError(expr->callee.line, "acosh() argument must be greater than or equal to 1.0.");
+            }
+            return Value(std::acosh(val));
+        }
+        if (calleeName == "atanh") {
+            checkNumArgs("atanh", 1);
+            double val = args[0].asNumber();
+            if (val <= -1.0 || val >= 1.0) {
+                throw RuntimeError(expr->callee.line, "atanh() argument must be strictly between -1.0 and 1.0.");
+            }
+            return Value(std::atanh(val));
+        }
+        if (calleeName == "hypot") {
+            if (args.size() != 2 && args.size() != 3) {
+                throw RuntimeError(expr->callee.line, "hypot() expects exactly 2 or 3 arguments.");
+            }
+            for (size_t i = 0; i < args.size(); ++i) {
+                if (!args[i].isNumber()) {
+                    throw RuntimeError(expr->callee.line, "Argument " + std::to_string(i + 1) + " of hypot() must be a number.");
+                }
+            }
+            if (args.size() == 2) {
+                return Value(std::hypot(args[0].asNumber(), args[1].asNumber()));
+            } else {
+                return Value(std::hypot(args[0].asNumber(), args[1].asNumber(), args[2].asNumber()));
+            }
+        }
+        if (calleeName == "ln") {
+            checkNumArgs("ln", 1);
+            double val = args[0].asNumber();
+            if (val <= 0.0) {
+                throw RuntimeError(expr->callee.line, "ln() argument must be positive.");
+            }
+            return Value(std::log(val));
+        }
+        if (calleeName == "log1p") {
+            checkNumArgs("log1p", 1);
+            double val = args[0].asNumber();
+            if (val <= -1.0) {
+                throw RuntimeError(expr->callee.line, "log1p() argument must be greater than -1.0.");
+            }
+            return Value(std::log1p(val));
+        }
+        if (calleeName == "expm1") {
+            checkNumArgs("expm1", 1);
+            return Value(std::expm1(args[0].asNumber()));
+        }
+        if (calleeName == "copysign") {
+            checkNumArgs("copysign", 2);
+            return Value(std::copysign(args[0].asNumber(), args[1].asNumber()));
+        }
+        if (calleeName == "sign" || calleeName == "sgn") {
+            checkNumArgs(calleeName, 1);
+            double val = args[0].asNumber();
+            if (val > 0.0) return Value(1.0);
+            if (val < 0.0) return Value(-1.0);
+            return Value(0.0);
+        }
+        if (calleeName == "trunc") {
+            checkNumArgs("trunc", 1);
+            return Value(std::trunc(args[0].asNumber()));
+        }
+        if (calleeName == "erf") {
+            checkNumArgs("erf", 1);
+            return Value(std::erf(args[0].asNumber()));
+        }
+        if (calleeName == "erfc") {
+            checkNumArgs("erfc", 1);
+            return Value(std::erfc(args[0].asNumber()));
+        }
+        if (calleeName == "tgamma") {
+            checkNumArgs("tgamma", 1);
+            return Value(std::tgamma(args[0].asNumber()));
+        }
+        if (calleeName == "lgamma") {
+            checkNumArgs("lgamma", 1);
+            return Value(std::lgamma(args[0].asNumber()));
+        }
+        if (calleeName == "isnan") {
+            checkNumArgs("isnan", 1);
+            return Value(std::isnan(args[0].asNumber()) ? 1.0 : 0.0);
+        }
+        if (calleeName == "isinf") {
+            checkNumArgs("isinf", 1);
+            return Value(std::isinf(args[0].asNumber()) ? 1.0 : 0.0);
+        }
+        if (calleeName == "isfinite") {
+            checkNumArgs("isfinite", 1);
+            return Value(std::isfinite(args[0].asNumber()) ? 1.0 : 0.0);
+        }
+        if (calleeName == "clamp") {
+            checkNumArgs("clamp", 3);
+            double val = args[0].asNumber();
+            double minVal = args[1].asNumber();
+            double maxVal = args[2].asNumber();
+            if (minVal > maxVal) {
+                throw RuntimeError(expr->callee.line, "clamp() min must be less than or equal to max.");
+            }
+            return Value(std::clamp(val, minVal, maxVal));
+        }
+        if (calleeName == "lerp") {
+            checkNumArgs("lerp", 3);
+            double startVal = args[0].asNumber();
+            double endVal = args[1].asNumber();
+            double t = args[2].asNumber();
+            return Value(startVal + t * (endVal - startVal));
+        }
+        if (calleeName == "rand" || calleeName == "random") {
+            if (args.size() != 0) {
+                throw RuntimeError(expr->callee.line, calleeName + "() expects exactly 0 arguments.");
+            }
+            std::uniform_real_distribution<double> dist(0.0, 1.0);
+            return Value(dist(rng));
+        }
+        if (calleeName == "randint") {
+            checkNumArgs("randint", 2);
+            double dMin = args[0].asNumber();
+            double dMax = args[1].asNumber();
+            if (std::floor(dMin) != dMin || std::floor(dMax) != dMax) {
+                throw RuntimeError(expr->callee.line, "randint() arguments must be integers.");
+            }
+            int minVal = static_cast<int>(dMin);
+            int maxVal = static_cast<int>(dMax);
+            if (minVal > maxVal) {
+                throw RuntimeError(expr->callee.line, "randint() min must be less than or equal to max.");
+            }
+            std::uniform_int_distribution<int> dist(minVal, maxVal);
+            return Value(static_cast<double>(dist(rng)));
+        }
+        if (calleeName == "srand" || calleeName == "seedRand") {
+            checkNumArgs(calleeName, 1);
+            rng.seed(static_cast<unsigned int>(args[0].asNumber()));
+            return Value();
+        }
+        if (calleeName == "fract") {
+            checkNumArgs("fract", 1);
+            double val = args[0].asNumber();
+            return Value(val - std::floor(val));
         }
         if (calleeName == "epilepsy") {
             if (args.size() != 0) {
