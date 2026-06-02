@@ -1,0 +1,122 @@
+win = gameWindow3D("EpilespyLang 3D Physics & Camera Demo", 800, 600)
+
+# Add a ground grid
+win.addGrid(0, 0, 40, 2, "gray")
+
+# Add some solid cubes to represent obstacles or structures
+win.addCube(-4, 0.5, 4, 1.0, "red")
+win.addCube(4, 1.0, 8, 2.0, "blue")
+win.addCube(0, 0.5, 12, 1.0, "green")
+win.addCube(-6, 1.5, 16, 3.0, "yellow")
+win.addCube(5, 0.75, 5, 1.5, "magenta")
+win.addCube(-3, 0.5, -2, 1.0, "orange")
+
+# Setup physics properties
+# Gravity is represented as a downward acceleration (default is -9.81, let's make it -15 for an arcade feel)
+win.setGravity(-15.0)
+win.enableGravity(true)
+
+# Initial player state
+px = 0
+py = 2
+pz = -6
+pitch = 0
+yaw = 0
+win.setCamera(px, py, pz, pitch, yaw)
+
+# Camera mode options: "first", "second", "third"
+currentMode = "first"
+win.setCameraMode(currentMode)
+
+# Set a fixed location for the 2nd person security camera looking down at the player
+win.setSecondPersonCamera(0, 8, -12)
+
+speed = 0.15
+jumpForce = 7.0
+firstClick = true
+lastX = 0
+lastY = 0
+
+while (win.isOpen()) {
+    # 1. Camera Mode Toggle keys
+    if (win.getKey("1")) {
+        currentMode = "first"
+        win.setCameraMode("first")
+    }
+    if (win.getKey("2")) {
+        currentMode = "second"
+        win.setCameraMode("second")
+    }
+    if (win.getKey("3")) {
+        currentMode = "third"
+        win.setCameraMode("third")
+    }
+
+    # 2. Player Movement (W/S/A/D)
+    if (win.getKey("w") or win.getKey("up")) {
+        win.moveCamera(speed, 0, 0)
+    }
+    if (win.getKey("s") or win.getKey("down")) {
+        win.moveCamera(-speed, 0, 0)
+    }
+    if (win.getKey("a") or win.getKey("left")) {
+        win.moveCamera(0, -speed, 0)
+    }
+    if (win.getKey("d") or win.getKey("right")) {
+        win.moveCamera(0, speed, 0)
+    }
+
+    # 3. Jump (Spacebar) - Jump method checks internally if player is grounded
+    if (win.getKey(" ")) {
+        win.jump(jumpForce)
+    }
+
+    # 4. Jetpack/Fly Up (Q/E) - Counteracts gravity manually
+    if (win.getKey("q")) {
+        win.moveCamera(0, 0, speed)
+    }
+    if (win.getKey("e")) {
+        win.moveCamera(0, 0, -speed)
+    }
+
+    # 5. Look around rotation using mouse drag (controls camera orientation)
+    if (win.getMouseLeft()) {
+        mx = win.getMouseX()
+        my = win.getMouseY()
+        if (firstClick) {
+            firstClick = false
+        } else {
+            dx = mx - lastX
+            dy = my - lastY
+            # Rotate camera pitch and yaw
+            win.rotateCamera(-dy * 0.003, dx * 0.003)
+        }
+        lastX = mx
+        lastY = my
+    } else {
+        firstClick = true
+    }
+
+    # 6. Render frame
+    win.clear("black")
+    win.render3D()
+
+    # Read current position for HUD
+    pos_x = win.getPlayerX()
+    pos_y = win.getPlayerY()
+    pos_z = win.getPlayerZ()
+    
+    # 7. Render 2D HUD text overlay
+    win.text(20, 20, "MODE: " + currentMode + " (Press 1=First Person | 2=Second Person | 3=Third Person)", "white", 16)
+    win.text(20, 45, "CONTROLS: W/S/A/D to Move | Space to Jump | Mouse drag to Look", "white", 16)
+    win.text(20, 70, "JETPACK: Q/E to fly up/down", "white", 16)
+    
+    # Render Position stats
+    groundedText = "No"
+    if (win.isGrounded()) {
+        groundedText = "Yes"
+    }
+    win.text(20, 105, "Player Pos: X=" + str(round(pos_x)) + " Y=" + str(round(pos_y)) + " Z=" + str(round(pos_z)) + " | Grounded: " + groundedText, "cyan", 16)
+
+    sleep(16)
+}
