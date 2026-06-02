@@ -302,6 +302,7 @@ button {
 .file-icon-hpp { color: var(--accent-purple); }
 .file-icon-md { color: var(--accent-green); }
 .file-icon-folder { color: var(--accent-yellow); }
+.file-icon-epscene { color: var(--accent-yellow); }
 .file-icon-generic { color: var(--text-secondary); }
 
 /* Loading state */
@@ -1228,3 +1229,484 @@ button {
 .toast.success i { color: var(--accent-green); }
 .toast.error i { color: var(--accent-red); }
 .toast.info i { color: var(--accent-blue); }
+
+/* ----------------------------------------------------
+   3D Scene Editor Layout and Styling
+   ---------------------------------------------------- */
+.scene-editor-root {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    background-color: #070a0e;
+    overflow: hidden;
+    font-family: var(--font-ui);
+}
+
+/* 1. Scene Editor Toolbar */
+.scene-editor-toolbar {
+    height: 48px;
+    background-color: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 16px;
+    z-index: 10;
+    flex-shrink: 0;
+}
+
+.toolbar-section {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.section-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+}
+
+.btn-group {
+    display: flex;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 2px;
+}
+
+.toolbar-btn {
+    height: 28px;
+    padding: 0 10px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 500;
+    transition: all 0.15s ease;
+    cursor: pointer;
+}
+
+.toolbar-btn:hover {
+    color: var(--text-primary);
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.toolbar-btn.active {
+    color: var(--accent-cyan);
+    background-color: var(--bg-primary);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border-color-active);
+}
+
+.toolbar-btn i {
+    width: 14px;
+    height: 14px;
+}
+
+.toolbar-divider {
+    width: 1px;
+    height: 20px;
+    background-color: var(--border-color);
+}
+
+.primary-action-btn {
+    background-color: rgba(0, 242, 254, 0.05);
+    border: 1px solid rgba(0, 242, 254, 0.15);
+    color: var(--accent-cyan);
+}
+
+.primary-action-btn:hover {
+    background-color: rgba(0, 242, 254, 0.15);
+    color: var(--text-light);
+    box-shadow: var(--neon-glow);
+}
+
+.danger-action-btn {
+    color: var(--accent-red);
+    background-color: rgba(244, 63, 94, 0.05);
+    border: 1px solid rgba(244, 63, 94, 0.15);
+}
+
+.danger-action-btn:hover {
+    background-color: var(--accent-red);
+    color: var(--text-light);
+    box-shadow: var(--neon-glow-red);
+}
+
+/* Snap Settings */
+.snap-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.snap-controls input[type="checkbox"] {
+    cursor: pointer;
+    accent-color: var(--accent-cyan);
+}
+
+.snap-controls input[type="number"] {
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 2px 6px;
+    color: var(--text-primary);
+    outline: none;
+    font-family: var(--font-mono);
+    font-size: 11px;
+}
+
+/* 2. Workspace Layout */
+.scene-workspace {
+    flex: 1;
+    display: flex;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Viewport */
+#scene-viewport {
+    flex: 1;
+    height: 100%;
+    position: relative;
+    outline: none;
+}
+
+#scene-viewport canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+/* HUD Overlay */
+.scene-hud-shortcuts {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    background: rgba(13, 18, 24, 0.8);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    pointer-events: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.scene-hud-shortcuts kbd {
+    background-color: var(--bg-tertiary);
+    color: var(--accent-cyan);
+    padding: 2px 5px;
+    border-radius: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    font-family: var(--font-mono);
+    font-weight: 600;
+}
+
+/* Asset shelf bottom dock */
+.scene-assets-drawer {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 480px;
+    background: rgba(13, 18, 24, 0.85);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 10px 14px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.drawer-header h4 {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+}
+
+.drawer-items {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.asset-card {
+    flex: 1;
+    height: 52px;
+    background-color: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+}
+
+.asset-card:hover {
+    background-color: rgba(0, 242, 254, 0.05);
+    border-color: var(--accent-cyan);
+    color: var(--text-primary);
+    transform: translateY(-2px);
+}
+
+.asset-icon i {
+    width: 16px;
+    height: 16px;
+    color: var(--text-muted);
+    transition: color 0.2s;
+}
+
+.asset-card:hover .asset-icon i {
+    color: var(--accent-cyan);
+}
+
+.drawer-item-divider {
+    width: 1px;
+    height: 40px;
+    background-color: var(--border-color);
+}
+
+.import-card {
+    border-style: dashed;
+}
+
+.import-card:hover {
+    background-color: rgba(139, 92, 246, 0.05);
+    border-color: var(--accent-purple);
+}
+
+.import-card:hover .asset-icon i {
+    color: var(--accent-purple);
+}
+
+/* Side Properties Panel */
+.scene-properties-panel {
+    width: 260px;
+    height: 100%;
+    background-color: var(--bg-secondary);
+    border-left: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    z-index: 5;
+    flex-shrink: 0;
+}
+
+.panel-header {
+    height: 40px;
+    padding: 0 16px;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.panel-header h3 {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    letter-spacing: 1px;
+}
+
+.panel-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+}
+
+.empty-selection-msg {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: var(--text-muted);
+    padding: 40px 10px;
+    gap: 12px;
+}
+
+.empty-selection-msg i {
+    width: 32px;
+    height: 32px;
+    stroke-width: 1.2;
+}
+
+.empty-selection-msg p {
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+/* Inspector Controls */
+.inspector-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.inspector-section:not(:last-child) {
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 20px;
+}
+
+.inspector-title {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+
+.field-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    margin-bottom: 8px;
+}
+
+.field-row label {
+    width: 80px;
+    color: var(--text-secondary);
+}
+
+.coord-group {
+    display: flex;
+    gap: 6px;
+    flex: 1;
+}
+
+.coord-input-wrapper {
+    flex: 1;
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.coord-label {
+    position: absolute;
+    left: 6px;
+    font-size: 9px;
+    font-weight: 800;
+    color: var(--text-muted);
+}
+
+.coord-input {
+    width: 100%;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 4px 4px 4px 18px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-primary);
+    outline: none;
+}
+
+.coord-input:focus {
+    border-color: var(--accent-cyan);
+}
+
+.text-input {
+    flex: 1;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 12px;
+    color: var(--text-primary);
+    outline: none;
+}
+
+.text-input:focus {
+    border-color: var(--accent-cyan);
+}
+
+/* Color Palette Picker */
+.palette-container {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 6px;
+    flex: 1;
+}
+
+.color-dot {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: transform 0.15s;
+    box-shadow: inset 0 0 2px rgba(0, 0, 0, 0.5);
+}
+
+.color-dot:hover {
+    transform: scale(1.15);
+}
+
+.color-dot.selected {
+    border-color: var(--text-light);
+    box-shadow: 0 0 6px var(--accent-cyan);
+    transform: scale(1.1);
+}
+
+.custom-picker-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.custom-picker-row input[type="color"] {
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    outline: none;
+}
+
+.custom-color-text {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+}
+
+.action-btn-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.action-btn-row button {
+    flex: 1;
+    font-size: 12px;
+}

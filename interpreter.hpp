@@ -718,6 +718,7 @@ public:
             auto win = std::make_shared<WindowInstance>(title, w, h);
             win->is3D = true;
             win->camX = 0; win->camY = 2; win->camZ = -5;
+            win->playerX = 0; win->playerY = 2; win->playerZ = -5;
             win->camPitch = 0; win->camYaw = 0;
             return Value(win);
         }
@@ -1722,6 +1723,40 @@ public:
                 return obj;
             }
 
+            if (methodName == "addBox") {
+                if (args.size() != 7) throw RuntimeError(expr->method.line, "addBox() expects exactly 7 arguments (x, y, z, sx, sy, sz, color).");
+                if (!args[0].isNumber() || !args[1].isNumber() || !args[2].isNumber() || !args[3].isNumber() || !args[4].isNumber() || !args[5].isNumber() || !args[6].isString()) {
+                    throw RuntimeError(expr->method.line, "addBox() expects (number, number, number, number, number, number, string).");
+                }
+                win->addBox(args[0].asNumber(), args[1].asNumber(), args[2].asNumber(), args[3].asNumber(), args[4].asNumber(), args[5].asNumber(), args[6].asString());
+                return obj;
+            }
+
+            if (methodName == "addTree") {
+                if (args.size() != 5) throw RuntimeError(expr->method.line, "addTree() expects exactly 5 arguments (x, y, z, trunkHeight, foliageSize).");
+                if (!args[0].isNumber() || !args[1].isNumber() || !args[2].isNumber() || !args[3].isNumber() || !args[4].isNumber()) {
+                    throw RuntimeError(expr->method.line, "addTree() expects (number, number, number, number, number).");
+                }
+                win->addTree(args[0].asNumber(), args[1].asNumber(), args[2].asNumber(), args[3].asNumber(), args[4].asNumber());
+                return obj;
+            }
+
+            if (methodName == "addModel") {
+                if (args.size() != 11) throw RuntimeError(expr->method.line, "addModel() expects exactly 11 arguments (x, y, z, sx, sy, sz, rx, ry, rz, modelPath, color).");
+                if (!args[0].isNumber() || !args[1].isNumber() || !args[2].isNumber() || !args[3].isNumber() || !args[4].isNumber() || !args[5].isNumber() || !args[6].isNumber() || !args[7].isNumber() || !args[8].isNumber() || !args[9].isString() || !args[10].isString()) {
+                    throw RuntimeError(expr->method.line, "addModel() expects (number, number, number, number, number, number, number, number, number, string, string).");
+                }
+                win->addModel(args[0].asNumber(), args[1].asNumber(), args[2].asNumber(), args[3].asNumber(), args[4].asNumber(), args[5].asNumber(), args[6].asNumber(), args[7].asNumber(), args[8].asNumber(), args[9].asString(), args[10].asString());
+                return obj;
+            }
+
+            if (methodName == "loadScene") {
+                if (args.size() != 1) throw RuntimeError(expr->method.line, "loadScene() expects exactly 1 argument (sceneFilePath).");
+                if (!args[0].isString()) throw RuntimeError(expr->method.line, "loadScene() expects a string argument.");
+                win->loadScene(args[0].asString());
+                return obj;
+            }
+
             if (methodName == "addGrid") {
                 if (args.size() != 5) throw RuntimeError(expr->method.line, "addGrid() expects exactly 5 arguments (x, z, size, spacing, color).");
                 if (!args[0].isNumber() || !args[1].isNumber() || !args[2].isNumber() || !args[3].isNumber() || !args[4].isString()) {
@@ -1816,6 +1851,62 @@ public:
                 if (args.size() != 0) throw RuntimeError(expr->method.line, "render2D() expects 0 arguments.");
                 win->render2D();
                 return obj;
+            }
+
+            if (methodName == "setGravity") {
+                if (args.size() != 1) throw RuntimeError(expr->method.line, "setGravity() expects exactly 1 argument (gravityValue).");
+                if (!args[0].isNumber()) throw RuntimeError(expr->method.line, "setGravity() argument must be a number.");
+                win->setGravity(args[0].asNumber());
+                return obj;
+            }
+
+            if (methodName == "enableGravity") {
+                if (args.size() != 1) throw RuntimeError(expr->method.line, "enableGravity() expects exactly 1 argument (boolean).");
+                win->enableGravity(args[0].isTruthy());
+                return obj;
+            }
+
+            if (methodName == "setCameraMode") {
+                if (args.size() != 1) throw RuntimeError(expr->method.line, "setCameraMode() expects exactly 1 argument (string).");
+                if (!args[0].isString()) throw RuntimeError(expr->method.line, "setCameraMode() argument must be a string (\"first\", \"second\", \"third\").");
+                win->setCameraMode(args[0].asString());
+                return obj;
+            }
+
+            if (methodName == "setSecondPersonCamera") {
+                if (args.size() != 3) throw RuntimeError(expr->method.line, "setSecondPersonCamera() expects exactly 3 arguments (x, y, z).");
+                if (!args[0].isNumber() || !args[1].isNumber() || !args[2].isNumber()) {
+                    throw RuntimeError(expr->method.line, "setSecondPersonCamera() arguments must be (number, number, number).");
+                }
+                win->setSecondPersonCamera(args[0].asNumber(), args[1].asNumber(), args[2].asNumber());
+                return obj;
+            }
+
+            if (methodName == "jump") {
+                if (args.size() != 1) throw RuntimeError(expr->method.line, "jump() expects exactly 1 argument (force).");
+                if (!args[0].isNumber()) throw RuntimeError(expr->method.line, "jump() argument must be a number.");
+                win->jump(args[0].asNumber());
+                return obj;
+            }
+
+            if (methodName == "getPlayerX") {
+                if (args.size() != 0) throw RuntimeError(expr->method.line, "getPlayerX() expects 0 arguments.");
+                return Value(win->getPlayerX());
+            }
+
+            if (methodName == "getPlayerY") {
+                if (args.size() != 0) throw RuntimeError(expr->method.line, "getPlayerY() expects 0 arguments.");
+                return Value(win->getPlayerY());
+            }
+
+            if (methodName == "getPlayerZ") {
+                if (args.size() != 0) throw RuntimeError(expr->method.line, "getPlayerZ() expects 0 arguments.");
+                return Value(win->getPlayerZ());
+            }
+
+            if (methodName == "isGrounded") {
+                if (args.size() != 0) throw RuntimeError(expr->method.line, "isGrounded() expects 0 arguments.");
+                return Value(win->getIsGrounded());
             }
 
             throw RuntimeError(expr->method.line, "Unknown method '" + methodName + "' on window object.");

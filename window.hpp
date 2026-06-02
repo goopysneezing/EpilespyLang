@@ -25,7 +25,10 @@ inline COLORREF parseColor(const std::string& colorName) {
         {"magenta", RGB(255, 0, 255)},
         {"gray", RGB(128, 128, 128)},
         {"lightgray", RGB(211, 211, 211)},
-        {"darkgray", RGB(169, 169, 169)}
+        {"darkgray", RGB(169, 169, 169)},
+        {"brown", RGB(139, 69, 19)},
+        {"saddlebrown", RGB(139, 69, 19)},
+        {"forestgreen", RGB(34, 139, 34)}
     };
 
     auto it = colorMap.find(colorName);
@@ -46,6 +49,8 @@ inline COLORREF parseColor(const std::string& colorName) {
 
 #include <vector>
 #include <algorithm>
+#include <fstream>
+#include <sstream>
 
 struct Vertex3D {
     double x, y, z;
@@ -110,6 +115,95 @@ public:
     double cam2DX = 0, cam2DY = 0, cam2DZoom = 1.0;
     std::vector<Object3D> objects3D;
     std::vector<Object2D> objects2D;
+
+    // Player and physics properties
+    double playerX = 0, playerY = 0, playerZ = 0;
+    double eyeHeight = 1.8;
+    double followDistance = 5.0;
+    double staticCameraX = 0, staticCameraY = 5, staticCameraZ = -10;
+    bool gravityEnabled = false;
+    double gravity = -9.81; // m/s^2
+    double velocityY = 0.0;
+    bool isGrounded = false;
+    std::string cameraMode = "first"; // "first", "second", "third"
+
+    void setGravity(double g) {
+        std::lock_guard<std::recursive_mutex> lock(mtx);
+        gravity = g;
+    }
+
+    void enableGravity(bool enable) {
+        std::lock_guard<std::recursive_mutex> lock(mtx);
+        gravityEnabled = enable;
+    }
+
+    void setCameraMode(const std::string& mode) {
+        std::lock_guard<std::recursive_mutex> lock(mtx);
+        if (mode == "first" || mode == "second" || mode == "third") {
+            cameraMode = mode;
+        }
+    }
+
+    void setSecondPersonCamera(double x, double y, double z) {
+        std::lock_guard<std::recursive_mutex> lock(mtx);
+        staticCameraX = x;
+        staticCameraY = y;
+        staticCameraZ = z;
+    }
+
+    void jump(double force) {
+        std::lock_guard<std::recursive_mutex> lock(mtx);
+        if (isGrounded || !gravityEnabled) {
+            velocityY = force;
+            isGrounded = false;
+        }
+    }
+
+    double getPlayerX() { std::lock_guard<std::recursive_mutex> lock(mtx); return playerX; }
+    double getPlayerY() { std::lock_guard<std::recursive_mutex> lock(mtx); return playerY; }
+    double getPlayerZ() { std::lock_guard<std::recursive_mutex> lock(mtx); return playerZ; }
+    bool getIsGrounded() { std::lock_guard<std::recursive_mutex> lock(mtx); return isGrounded; }
+
+    void updatePhysicsInternal(double dt) {
+        if (gravityEnabled) {
+            velocityY += gravity * dt;
+            playerY += velocityY * dt;
+            if (playerY <= 0.0) {
+                playerY = 0.0;
+                velocityY = 0.0;
+                isGrounded = true;
+            } else {
+                isGrounded = false;
+            }
+        }
+    }
+
+    void updateCameraPosInternal() {
+        if (cameraMode == "first") {
+            camX = playerX;
+            camY = playerY + eyeHeight;
+            camZ = playerZ;
+        } 
+        else if (cameraMode == "second") {
+            camX = staticCameraX;
+            camY = staticCameraY;
+            camZ = staticCameraZ;
+            double dx = playerX - camX;
+            double dy = (playerY + eyeHeight/2.0) - camY;
+            double dz = playerZ - camZ;
+            double dist = std::hypot(dx, dz);
+            camYaw = std::atan2(dx, dz);
+            camPitch = std::atan2(dy, dist);
+        }
+        else if (cameraMode == "third") {
+            double dx = -std::sin(camYaw) * std::cos(camPitch) * followDistance;
+            double dy = -std::sin(camPitch) * followDistance;
+            double dz = -std::cos(camYaw) * std::cos(camPitch) * followDistance;
+            camX = playerX + dx;
+            camY = playerY + eyeHeight + dy;
+            camZ = playerZ + dz;
+        }
+    }
 
     WindowInstance(const std::string& title, int w, int h)
         : title(title), width(w), height(h) {
@@ -504,6 +598,164 @@ public:
         objects3D.push_back(obj);
     }
 
+    void addBox(double x, double y, double z, double sx, double sy, double sz, const std::string& colorName) {
+        std::lock_guard<std::recursive_mutex> lock(mtx);
+        Object3D obj;
+        obj.type = "cube";
+        obj.px = x; obj.py = y; obj.pz = z;
+        obj.rx = 0; obj.ry = 0; obj.rz = 0;
+        obj.scaleX = sx; obj.scaleY = sy; obj.scaleZ = sz;
+
+        // 8 vertices of unit cube centered at origin
+        obj.vertices = {
+            {-0.5, -0.5, -0.5}, {0.5, -0.5, -0.5}, {0.5, 0.5, -0.5}, {-0.5, 0.5, -0.5},
+            {-0.5, -0.5, 0.5},  {0.5, -0.5, 0.5},  {0.5, 0.5, 0.5},  {-0.5, 0.5, 0.5}
+        };
+
+        // 6 faces
+        obj.faces = {
+            {{0, 3, 2, 1}, 4, colorName, 0.0}, // Front
+            {{5, 6, 7, 4}, 4, colorName, 0.0}, // Back
+            {{4, 7, 3, 0}, 4, colorName, 0.0}, // Left
+            {{1, 2, 6, 5}, 4, colorName, 0.0}, // Right
+            {{3, 7, 6, 2}, 4, colorName, 0.0}, // Top
+            {{0, 1, 5, 4}, 4, colorName, 0.0}  // Bottom
+        };
+
+        objects3D.push_back(obj);
+    }
+
+    void addTree(double x, double y, double z, double trunkHeight, double foliageSize) {
+        std::lock_guard<std::recursive_mutex> lock(mtx);
+        Object3D obj;
+        obj.type = "tree";
+        obj.px = x; obj.py = y; obj.pz = z;
+        obj.rx = 0; obj.ry = 0; obj.rz = 0;
+        obj.scaleX = 1.0; obj.scaleY = 1.0; obj.scaleZ = 1.0;
+
+        double tw = 0.3;
+        double th = trunkHeight;
+        double fw = foliageSize;
+        double fh = foliageSize * 1.5;
+
+        // 8 trunk vertices + 8 foliage vertices
+        obj.vertices = {
+            {-tw/2.0, 0.0, -tw/2.0}, {tw/2.0, 0.0, -tw/2.0}, {tw/2.0, th, -tw/2.0}, {-tw/2.0, th, -tw/2.0},
+            {-tw/2.0, 0.0, tw/2.0},  {tw/2.0, 0.0, tw/2.0},  {tw/2.0, th, tw/2.0},  {-tw/2.0, th, tw/2.0},
+
+            {-fw/2.0, th, -fw/2.0}, {fw/2.0, th, -fw/2.0}, {fw/2.0, th + fh, -fw/2.0}, {-fw/2.0, th + fh, -fw/2.0},
+            {-fw/2.0, th, fw/2.0},  {fw/2.0, th, fw/2.0},  {fw/2.0, th + fh, fw/2.0},  {-fw/2.0, th + fh, fw/2.0}
+        };
+
+        obj.faces = {
+            // Trunk (SaddleBrown)
+            {{0, 3, 2, 1}, 4, "saddlebrown", 0.0},
+            {{5, 6, 7, 4}, 4, "saddlebrown", 0.0},
+            {{4, 7, 3, 0}, 4, "saddlebrown", 0.0},
+            {{1, 2, 6, 5}, 4, "saddlebrown", 0.0},
+            {{3, 7, 6, 2}, 4, "saddlebrown", 0.0},
+            {{0, 1, 5, 4}, 4, "saddlebrown", 0.0},
+
+            // Foliage (ForestGreen)
+            {{8, 11, 10, 9}, 4, "forestgreen", 0.0},
+            {{13, 14, 15, 12}, 4, "forestgreen", 0.0},
+            {{12, 15, 11, 8}, 4, "forestgreen", 0.0},
+            {{9, 10, 14, 13}, 4, "forestgreen", 0.0},
+            {{11, 15, 14, 10}, 4, "forestgreen", 0.0},
+            {{8, 9, 13, 12}, 4, "forestgreen", 0.0}
+        };
+
+        objects3D.push_back(obj);
+    }
+
+    void addModel(double x, double y, double z, double sx, double sy, double sz, double rx, double ry, double rz, const std::string& objPath, const std::string& colorName) {
+        std::lock_guard<std::recursive_mutex> lock(mtx);
+        
+        Object3D obj;
+        obj.type = "model";
+        obj.px = x; obj.py = y; obj.pz = z;
+        obj.rx = rx; obj.ry = ry; obj.rz = rz;
+        obj.scaleX = sx; obj.scaleY = sy; obj.scaleZ = sz;
+
+        std::ifstream file(objPath);
+        if (!file.is_open()) {
+            // Fallback placeholder box
+            addBox(x, y, z, sx, sy, sz, colorName);
+            return;
+        }
+
+        std::string line;
+        while (std::getline(file, line)) {
+            if (line.empty() || line[0] == '#') continue;
+            std::stringstream ss(line);
+            std::string prefix;
+            ss >> prefix;
+            if (prefix == "v") {
+                double vx, vy, vz;
+                if (ss >> vx >> vy >> vz) {
+                    obj.vertices.push_back({vx, vy, vz});
+                }
+            } else if (prefix == "f") {
+                std::string vStr;
+                Face3D face;
+                face.numVertices = 0;
+                face.color = colorName;
+                face.depth = 0.0;
+                while (ss >> vStr && face.numVertices < 4) {
+                    size_t slashPos = vStr.find('/');
+                    std::string idxStr = (slashPos == std::string::npos) ? vStr : vStr.substr(0, slashPos);
+                    if (idxStr.empty()) continue;
+                    int idx = std::stoi(idxStr);
+                    if (idx > 0) {
+                        face.indices[face.numVertices++] = idx - 1;
+                    } else if (idx < 0) {
+                        face.indices[face.numVertices++] = static_cast<int>(obj.vertices.size()) + idx;
+                    }
+                }
+                if (face.numVertices >= 3) {
+                    obj.faces.push_back(face);
+                }
+            }
+        }
+        objects3D.push_back(obj);
+    }
+
+    void loadScene(const std::string& scenePath) {
+        std::ifstream file(scenePath);
+        if (!file.is_open()) return;
+        std::string line;
+        while (std::getline(file, line)) {
+            if (line.empty() || line[0] == '#') continue;
+            std::stringstream ss(line);
+            std::string type;
+            ss >> type;
+            if (type == "grid") {
+                double x, z, size, spacing;
+                std::string color;
+                if (ss >> x >> z >> size >> spacing >> color) {
+                    addGrid(x, z, size, spacing, color);
+                }
+            } else if (type == "cube" || type == "box") {
+                double x, y, z, sx, sy, sz;
+                std::string color;
+                if (ss >> x >> y >> z >> sx >> sy >> sz >> color) {
+                    addBox(x, y, z, sx, sy, sz, color);
+                }
+            } else if (type == "tree") {
+                double x, y, z, th, fs;
+                if (ss >> x >> y >> z >> th >> fs) {
+                    addTree(x, y, z, th, fs);
+                }
+            } else if (type == "model") {
+                double x, y, z, sx, sy, sz, rx, ry, rz;
+                std::string modelPath, color;
+                if (ss >> x >> y >> z >> sx >> sy >> sz >> rx >> ry >> rz >> modelPath >> color) {
+                    addModel(x, y, z, sx, sy, sz, rx, ry, rz, modelPath, color);
+                }
+            }
+        }
+    }
+
     void addGrid(double x, double z, double size, double spacing, const std::string& colorName) {
         std::lock_guard<std::recursive_mutex> lock(mtx);
         double halfSize = size / 2.0;
@@ -543,26 +795,24 @@ public:
 
     void setCamera(double x, double y, double z, double pitch, double yaw) {
         std::lock_guard<std::recursive_mutex> lock(mtx);
-        camX = x;
-        camY = y;
-        camZ = z;
+        playerX = x;
+        playerY = y;
+        playerZ = z;
         camPitch = pitch;
         camYaw = yaw;
     }
 
     void moveCamera(double forward, double right, double up) {
         std::lock_guard<std::recursive_mutex> lock(mtx);
-        double fx = std::sin(camYaw) * std::cos(camPitch);
-        double fy = std::sin(camPitch);
-        double fz = std::cos(camYaw) * std::cos(camPitch);
+        double fx = -std::sin(camYaw);
+        double fz = std::cos(camYaw);
 
         double rx = std::cos(camYaw);
-        double ry = 0;
-        double rz = -std::sin(camYaw);
+        double rz = std::sin(camYaw);
 
-        camX += forward * fx + right * rx;
-        camY += forward * fy + right * ry + up;
-        camZ += forward * fz + right * rz;
+        playerX += forward * fx + right * rx;
+        playerZ += forward * fz + right * rz;
+        playerY += up;
     }
 
     void rotateCamera(double dpitch, double dyaw) {
@@ -581,6 +831,11 @@ public:
 
     void render3D() {
         std::lock_guard<std::recursive_mutex> lock(mtx);
+        
+        // Update physics and camera positioning
+        updatePhysicsInternal(0.016);
+        updateCameraPosInternal();
+
         if (is3D) {
             if (!hglrcGL || !hdcGL) return;
 
@@ -627,14 +882,18 @@ public:
                 glRotated(obj.rz * 180.0 / 3.1415926535, 0, 0, 1);
                 glScaled(obj.scaleX, obj.scaleY, obj.scaleZ);
 
-                if (obj.type == "cube") {
+                if (obj.type == "cube" || obj.type == "tree" || obj.type == "model") {
                     for (const auto& face : obj.faces) {
                         COLORREF color = parseColor(face.color);
                         float r = GetRValue(color) / 255.0f;
                         float g = GetGValue(color) / 255.0f;
                         float b = GetBValue(color) / 255.0f;
 
-                        glBegin(GL_QUADS);
+                        if (face.numVertices == 3) glBegin(GL_TRIANGLES);
+                        else if (face.numVertices == 4) glBegin(GL_QUADS);
+                        else if (face.numVertices == 2) glBegin(GL_LINES);
+                        else glBegin(GL_POLYGON);
+
                         glColor3f(r, g, b);
                         for (int i = 0; i < face.numVertices; ++i) {
                             const auto& v = obj.vertices[face.indices[i]];
@@ -662,6 +921,38 @@ public:
                 glPopMatrix();
             }
 
+            // Draw player box in OpenGL if not in first-person mode
+            if (cameraMode != "first") {
+                glPushMatrix();
+                glTranslated(playerX, playerY + 0.9, playerZ);
+                glRotated(camYaw * 180.0 / 3.1415926535, 0, 1, 0); // Rotate player with camera view
+                
+                double s = 0.3; // radius/width
+                double h = 0.9; // half height
+                
+                glBegin(GL_QUADS);
+                // Front - distinct orange face
+                glColor3f(1.0f, 0.4f, 0.0f);
+                glVertex3d(-s, -h, -s); glVertex3d(s, -h, -s); glVertex3d(s, h, -s); glVertex3d(-s, h, -s);
+                // Back - cyan
+                glColor3f(0.0f, 0.7f, 1.0f);
+                glVertex3d(-s, -h, s); glVertex3d(-s, h, s); glVertex3d(s, h, s); glVertex3d(s, -h, s);
+                // Left - cyan
+                glColor3f(0.0f, 0.7f, 1.0f);
+                glVertex3d(-s, -h, s); glVertex3d(-s, -h, -s); glVertex3d(-s, h, -s); glVertex3d(-s, h, s);
+                // Right - cyan
+                glColor3f(0.0f, 0.7f, 1.0f);
+                glVertex3d(s, -h, -s); glVertex3d(s, -h, s); glVertex3d(s, h, s); glVertex3d(s, h, -s);
+                // Top - cyan
+                glColor3f(0.0f, 0.7f, 1.0f);
+                glVertex3d(-s, h, -s); glVertex3d(s, h, -s); glVertex3d(s, h, s); glVertex3d(-s, h, s);
+                // Bottom - cyan
+                glColor3f(0.0f, 0.7f, 1.0f);
+                glVertex3d(-s, -h, -s); glVertex3d(-s, -h, s); glVertex3d(s, -h, s); glVertex3d(s, -h, -s);
+                glEnd();
+                glPopMatrix();
+            }
+
             present();
             return;
         }
@@ -684,7 +975,35 @@ public:
         double cosPitch = std::cos(camPitch);
         double sinPitch = std::sin(camPitch);
 
-        for (const auto& obj : objects3D) {
+        // Copy objects and inject player object if in 2nd or 3rd person camera mode
+        std::vector<Object3D> renderObjects = objects3D;
+        if (cameraMode != "first") {
+            Object3D pObj;
+            pObj.type = "cube";
+            pObj.px = playerX;
+            pObj.py = playerY + 0.9;
+            pObj.pz = playerZ;
+            pObj.rx = 0; pObj.ry = camYaw; pObj.rz = 0; // Rotate player by camYaw
+            pObj.scaleX = 1; pObj.scaleY = 1; pObj.scaleZ = 1;
+
+            double s = 0.3;
+            double h = 0.9;
+            pObj.vertices = {
+                {-s, -h, -s}, {s, -h, -s}, {s, h, -s}, {-s, h, -s},
+                {-s, -h, s},  {s, -h, s},  {s, h, s},  {-s, h, s}
+            };
+            pObj.faces = {
+                {{0, 3, 2, 1}, 4, "orange", 0.0}, // Front face is orange
+                {{5, 6, 7, 4}, 4, "cyan", 0.0},
+                {{4, 7, 3, 0}, 4, "cyan", 0.0},
+                {{1, 2, 6, 5}, 4, "cyan", 0.0},
+                {{3, 7, 6, 2}, 4, "cyan", 0.0},
+                {{0, 1, 5, 4}, 4, "cyan", 0.0}
+            };
+            renderObjects.push_back(pObj);
+        }
+
+        for (const auto& obj : renderObjects) {
             double cosRX = std::cos(obj.rx), sinRX = std::sin(obj.rx);
             double cosRY = std::cos(obj.ry), sinRY = std::sin(obj.ry);
             double cosRZ = std::cos(obj.rz), sinRZ = std::sin(obj.rz);
