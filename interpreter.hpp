@@ -1344,6 +1344,40 @@ public:
                 return obj;
             }
 
+            if (methodName == "addBox") {
+                if (args.size() != 7) throw RuntimeError(expr->method.line, "addBox() expects exactly 7 arguments (x, y, z, sx, sy, sz, color).");
+                if (!args[0].isNumber() || !args[1].isNumber() || !args[2].isNumber() || !args[3].isNumber() || !args[4].isNumber() || !args[5].isNumber() || !args[6].isString()) {
+                    throw RuntimeError(expr->method.line, "addBox() expects (number, number, number, number, number, number, string).");
+                }
+                win->addBox(args[0].asNumber(), args[1].asNumber(), args[2].asNumber(), args[3].asNumber(), args[4].asNumber(), args[5].asNumber(), args[6].asString());
+                return obj;
+            }
+
+            if (methodName == "addTree") {
+                if (args.size() != 5) throw RuntimeError(expr->method.line, "addTree() expects exactly 5 arguments (x, y, z, trunkHeight, foliageSize).");
+                if (!args[0].isNumber() || !args[1].isNumber() || !args[2].isNumber() || !args[3].isNumber() || !args[4].isNumber()) {
+                    throw RuntimeError(expr->method.line, "addTree() expects (number, number, number, number, number).");
+                }
+                win->addTree(args[0].asNumber(), args[1].asNumber(), args[2].asNumber(), args[3].asNumber(), args[4].asNumber());
+                return obj;
+            }
+
+            if (methodName == "addModel") {
+                if (args.size() != 11) throw RuntimeError(expr->method.line, "addModel() expects exactly 11 arguments (x, y, z, sx, sy, sz, rx, ry, rz, modelPath, color).");
+                if (!args[0].isNumber() || !args[1].isNumber() || !args[2].isNumber() || !args[3].isNumber() || !args[4].isNumber() || !args[5].isNumber() || !args[6].isNumber() || !args[7].isNumber() || !args[8].isNumber() || !args[9].isString() || !args[10].isString()) {
+                    throw RuntimeError(expr->method.line, "addModel() expects (number, number, number, number, number, number, number, number, number, string, string).");
+                }
+                win->addModel(args[0].asNumber(), args[1].asNumber(), args[2].asNumber(), args[3].asNumber(), args[4].asNumber(), args[5].asNumber(), args[6].asNumber(), args[7].asNumber(), args[8].asNumber(), args[9].asString(), args[10].asString());
+                return obj;
+            }
+
+            if (methodName == "loadScene") {
+                if (args.size() != 1) throw RuntimeError(expr->method.line, "loadScene() expects exactly 1 argument (sceneFilePath).");
+                if (!args[0].isString()) throw RuntimeError(expr->method.line, "loadScene() expects a string argument.");
+                win->loadScene(args[0].asString());
+                return obj;
+            }
+
             if (methodName == "addGrid") {
                 if (args.size() != 5) throw RuntimeError(expr->method.line, "addGrid() expects exactly 5 arguments (x, z, size, spacing, color).");
                 if (!args[0].isNumber() || !args[1].isNumber() || !args[2].isNumber() || !args[3].isNumber() || !args[4].isString()) {

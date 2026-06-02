@@ -25,7 +25,10 @@ inline COLORREF parseColor(const std::string& colorName) {
         {"magenta", RGB(255, 0, 255)},
         {"gray", RGB(128, 128, 128)},
         {"lightgray", RGB(211, 211, 211)},
-        {"darkgray", RGB(169, 169, 169)}
+        {"darkgray", RGB(169, 169, 169)},
+        {"brown", RGB(139, 69, 19)},
+        {"saddlebrown", RGB(139, 69, 19)},
+        {"forestgreen", RGB(34, 139, 34)}
     };
 
     auto it = colorMap.find(colorName);
@@ -46,6 +49,8 @@ inline COLORREF parseColor(const std::string& colorName) {
 
 #include <vector>
 #include <algorithm>
+#include <fstream>
+#include <sstream>
 
 struct Vertex3D {
     double x, y, z;
@@ -593,6 +598,164 @@ public:
         objects3D.push_back(obj);
     }
 
+    void addBox(double x, double y, double z, double sx, double sy, double sz, const std::string& colorName) {
+        std::lock_guard<std::recursive_mutex> lock(mtx);
+        Object3D obj;
+        obj.type = "cube";
+        obj.px = x; obj.py = y; obj.pz = z;
+        obj.rx = 0; obj.ry = 0; obj.rz = 0;
+        obj.scaleX = sx; obj.scaleY = sy; obj.scaleZ = sz;
+
+        // 8 vertices of unit cube centered at origin
+        obj.vertices = {
+            {-0.5, -0.5, -0.5}, {0.5, -0.5, -0.5}, {0.5, 0.5, -0.5}, {-0.5, 0.5, -0.5},
+            {-0.5, -0.5, 0.5},  {0.5, -0.5, 0.5},  {0.5, 0.5, 0.5},  {-0.5, 0.5, 0.5}
+        };
+
+        // 6 faces
+        obj.faces = {
+            {{0, 3, 2, 1}, 4, colorName, 0.0}, // Front
+            {{5, 6, 7, 4}, 4, colorName, 0.0}, // Back
+            {{4, 7, 3, 0}, 4, colorName, 0.0}, // Left
+            {{1, 2, 6, 5}, 4, colorName, 0.0}, // Right
+            {{3, 7, 6, 2}, 4, colorName, 0.0}, // Top
+            {{0, 1, 5, 4}, 4, colorName, 0.0}  // Bottom
+        };
+
+        objects3D.push_back(obj);
+    }
+
+    void addTree(double x, double y, double z, double trunkHeight, double foliageSize) {
+        std::lock_guard<std::recursive_mutex> lock(mtx);
+        Object3D obj;
+        obj.type = "tree";
+        obj.px = x; obj.py = y; obj.pz = z;
+        obj.rx = 0; obj.ry = 0; obj.rz = 0;
+        obj.scaleX = 1.0; obj.scaleY = 1.0; obj.scaleZ = 1.0;
+
+        double tw = 0.3;
+        double th = trunkHeight;
+        double fw = foliageSize;
+        double fh = foliageSize * 1.5;
+
+        // 8 trunk vertices + 8 foliage vertices
+        obj.vertices = {
+            {-tw/2.0, 0.0, -tw/2.0}, {tw/2.0, 0.0, -tw/2.0}, {tw/2.0, th, -tw/2.0}, {-tw/2.0, th, -tw/2.0},
+            {-tw/2.0, 0.0, tw/2.0},  {tw/2.0, 0.0, tw/2.0},  {tw/2.0, th, tw/2.0},  {-tw/2.0, th, tw/2.0},
+
+            {-fw/2.0, th, -fw/2.0}, {fw/2.0, th, -fw/2.0}, {fw/2.0, th + fh, -fw/2.0}, {-fw/2.0, th + fh, -fw/2.0},
+            {-fw/2.0, th, fw/2.0},  {fw/2.0, th, fw/2.0},  {fw/2.0, th + fh, fw/2.0},  {-fw/2.0, th + fh, fw/2.0}
+        };
+
+        obj.faces = {
+            // Trunk (SaddleBrown)
+            {{0, 3, 2, 1}, 4, "saddlebrown", 0.0},
+            {{5, 6, 7, 4}, 4, "saddlebrown", 0.0},
+            {{4, 7, 3, 0}, 4, "saddlebrown", 0.0},
+            {{1, 2, 6, 5}, 4, "saddlebrown", 0.0},
+            {{3, 7, 6, 2}, 4, "saddlebrown", 0.0},
+            {{0, 1, 5, 4}, 4, "saddlebrown", 0.0},
+
+            // Foliage (ForestGreen)
+            {{8, 11, 10, 9}, 4, "forestgreen", 0.0},
+            {{13, 14, 15, 12}, 4, "forestgreen", 0.0},
+            {{12, 15, 11, 8}, 4, "forestgreen", 0.0},
+            {{9, 10, 14, 13}, 4, "forestgreen", 0.0},
+            {{11, 15, 14, 10}, 4, "forestgreen", 0.0},
+            {{8, 9, 13, 12}, 4, "forestgreen", 0.0}
+        };
+
+        objects3D.push_back(obj);
+    }
+
+    void addModel(double x, double y, double z, double sx, double sy, double sz, double rx, double ry, double rz, const std::string& objPath, const std::string& colorName) {
+        std::lock_guard<std::recursive_mutex> lock(mtx);
+        
+        Object3D obj;
+        obj.type = "model";
+        obj.px = x; obj.py = y; obj.pz = z;
+        obj.rx = rx; obj.ry = ry; obj.rz = rz;
+        obj.scaleX = sx; obj.scaleY = sy; obj.scaleZ = sz;
+
+        std::ifstream file(objPath);
+        if (!file.is_open()) {
+            // Fallback placeholder box
+            addBox(x, y, z, sx, sy, sz, colorName);
+            return;
+        }
+
+        std::string line;
+        while (std::getline(file, line)) {
+            if (line.empty() || line[0] == '#') continue;
+            std::stringstream ss(line);
+            std::string prefix;
+            ss >> prefix;
+            if (prefix == "v") {
+                double vx, vy, vz;
+                if (ss >> vx >> vy >> vz) {
+                    obj.vertices.push_back({vx, vy, vz});
+                }
+            } else if (prefix == "f") {
+                std::string vStr;
+                Face3D face;
+                face.numVertices = 0;
+                face.color = colorName;
+                face.depth = 0.0;
+                while (ss >> vStr && face.numVertices < 4) {
+                    size_t slashPos = vStr.find('/');
+                    std::string idxStr = (slashPos == std::string::npos) ? vStr : vStr.substr(0, slashPos);
+                    if (idxStr.empty()) continue;
+                    int idx = std::stoi(idxStr);
+                    if (idx > 0) {
+                        face.indices[face.numVertices++] = idx - 1;
+                    } else if (idx < 0) {
+                        face.indices[face.numVertices++] = static_cast<int>(obj.vertices.size()) + idx;
+                    }
+                }
+                if (face.numVertices >= 3) {
+                    obj.faces.push_back(face);
+                }
+            }
+        }
+        objects3D.push_back(obj);
+    }
+
+    void loadScene(const std::string& scenePath) {
+        std::ifstream file(scenePath);
+        if (!file.is_open()) return;
+        std::string line;
+        while (std::getline(file, line)) {
+            if (line.empty() || line[0] == '#') continue;
+            std::stringstream ss(line);
+            std::string type;
+            ss >> type;
+            if (type == "grid") {
+                double x, z, size, spacing;
+                std::string color;
+                if (ss >> x >> z >> size >> spacing >> color) {
+                    addGrid(x, z, size, spacing, color);
+                }
+            } else if (type == "cube" || type == "box") {
+                double x, y, z, sx, sy, sz;
+                std::string color;
+                if (ss >> x >> y >> z >> sx >> sy >> sz >> color) {
+                    addBox(x, y, z, sx, sy, sz, color);
+                }
+            } else if (type == "tree") {
+                double x, y, z, th, fs;
+                if (ss >> x >> y >> z >> th >> fs) {
+                    addTree(x, y, z, th, fs);
+                }
+            } else if (type == "model") {
+                double x, y, z, sx, sy, sz, rx, ry, rz;
+                std::string modelPath, color;
+                if (ss >> x >> y >> z >> sx >> sy >> sz >> rx >> ry >> rz >> modelPath >> color) {
+                    addModel(x, y, z, sx, sy, sz, rx, ry, rz, modelPath, color);
+                }
+            }
+        }
+    }
+
     void addGrid(double x, double z, double size, double spacing, const std::string& colorName) {
         std::lock_guard<std::recursive_mutex> lock(mtx);
         double halfSize = size / 2.0;
@@ -719,14 +882,18 @@ public:
                 glRotated(obj.rz * 180.0 / 3.1415926535, 0, 0, 1);
                 glScaled(obj.scaleX, obj.scaleY, obj.scaleZ);
 
-                if (obj.type == "cube") {
+                if (obj.type == "cube" || obj.type == "tree" || obj.type == "model") {
                     for (const auto& face : obj.faces) {
                         COLORREF color = parseColor(face.color);
                         float r = GetRValue(color) / 255.0f;
                         float g = GetGValue(color) / 255.0f;
                         float b = GetBValue(color) / 255.0f;
 
-                        glBegin(GL_QUADS);
+                        if (face.numVertices == 3) glBegin(GL_TRIANGLES);
+                        else if (face.numVertices == 4) glBegin(GL_QUADS);
+                        else if (face.numVertices == 2) glBegin(GL_LINES);
+                        else glBegin(GL_POLYGON);
+
                         glColor3f(r, g, b);
                         for (int i = 0; i < face.numVertices; ++i) {
                             const auto& v = obj.vertices[face.indices[i]];

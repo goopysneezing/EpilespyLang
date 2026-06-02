@@ -162,6 +162,7 @@ function getLanguageId(filePath) {
     if (ext === 'cpp' || ext === 'hpp') return 'cpp';
     if (ext === 'md') return 'markdown';
     if (ext === 'json') return 'json';
+    if (ext === 'epscene') return 'plaintext';
     return 'plaintext';
 }
 
@@ -172,6 +173,7 @@ function getFileIconClass(filePath) {
     if (ext === 'cpp') return 'file-icon-cpp';
     if (ext === 'hpp') return 'file-icon-hpp';
     if (ext === 'md') return 'file-icon-md';
+    if (ext === 'epscene') return 'file-icon-epscene';
     return 'file-icon-generic';
 }
 
@@ -180,6 +182,7 @@ function getFileIcon(filePath) {
     if (ext === 'ep') return 'code';
     if (ext === 'cpp' || ext === 'hpp') return 'terminal';
     if (ext === 'md') return 'book-open';
+    if (ext === 'epscene') return 'map';
     return 'file';
 }
 
@@ -261,16 +264,20 @@ async function openFile(filePath) {
             if (!response.ok) throw new Error(`Could not read file: ${filePath}`);
             const data = await response.json();
             
-            // Create a new Monaco text model
-            const lang = getLanguageId(filePath);
-            const model = monaco.editor.createModel(data.content, lang);
+            const isScene = filePath.toLowerCase().endsWith('.epscene');
+            let model = null;
+            if (!isScene) {
+                const lang = getLanguageId(filePath);
+                model = monaco.editor.createModel(data.content, lang);
+            }
             
             tab = {
                 path: filePath,
                 name: filePath.split(/[/\\]/).pop(),
                 isDirty: false,
                 model: model,
-                originalContent: data.content
+                originalContent: data.content,
+                isScene: isScene
             };
             openTabs.push(tab);
         } catch (err) {
@@ -282,11 +289,35 @@ async function openFile(filePath) {
     // 2. Set Active Tab
     activeTabPath = filePath;
     
-    // Switch Monaco instance model
+    // Switch between Monaco and Scene Editor
     document.getElementById('empty-editor-message').style.display = 'none';
-    document.getElementById('monaco-editor-instance').style.display = 'block';
-    editor.setModel(tab.model);
-    editor.focus();
+    
+    if (tab.isScene) {
+        document.getElementById('monaco-editor-instance').style.display = 'none';
+        document.getElementById('scene-editor-container').style.display = 'flex';
+        
+        if (!window.sceneEditorInitialized) {
+            window.sceneEditor.init();
+            window.sceneEditorInitialized = true;
+        }
+        
+        // If tab is dirty, we should load what's currently in the editor scene, 
+        // otherwise load the original file content.
+        let contentToLoad = tab.originalContent;
+        if (tab.isDirty && tab.currentSceneContent) {
+            contentToLoad = tab.currentSceneContent;
+        }
+        window.sceneEditor.loadScene(contentToLoad);
+        
+        setTimeout(() => {
+            window.sceneEditor.resize();
+        }, 50);
+    } else {
+        document.getElementById('scene-editor-container').style.display = 'none';
+        document.getElementById('monaco-editor-instance').style.display = 'block';
+        editor.setModel(tab.model);
+        editor.focus();
+    }
 
     // 3. Update UI states
     renderTabs();
@@ -354,7 +385,9 @@ function closeFile(filePath) {
     }
 
     // Dispose model to free memory
-    tab.model.dispose();
+    if (tab.model) {
+        tab.model.dispose();
+    }
     openTabs.splice(tabIdx, 1);
 
     if (activeTabPath === filePath) {
@@ -381,7 +414,12 @@ async function saveCurrentFile() {
     const tab = openTabs.find(t => t.path === activeTabPath);
     if (!tab || !tab.isDirty) return;
 
-    const currentVal = editor.getValue();
+    let currentVal;
+    if (tab.isScene) {
+        currentVal = window.sceneEditor.serialize();
+    } else {
+        currentVal = editor.getValue();
+    }
     try {
         const response = await fetch('/api/write', {
             method: 'POST',
@@ -888,6 +926,9 @@ window.addEventListener('DOMContentLoaded', async () => {
         if (editor) {
             setTimeout(() => editor.layout(), 250);
         }
+        if (window.sceneEditorInitialized && window.sceneEditor) {
+            setTimeout(() => window.sceneEditor.resize(), 250);
+        }
     });
 
     // 9. Global Search input bindings
@@ -931,7 +972,28 @@ window.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // 12. Start connection heartbeat checks to auto-close when server shuts down (Ctrl+C)
+    // 12. Window global resize listener for Three.js
+    window.addEventListener('resize', () => {
+        if (window.sceneEditorInitialized && window.sceneEditor) {
+            window.sceneEditor.resize();
+        }
+    });
+
+    // 13. Mark active level editor tab dirty on modifications
+    window.markSceneTabDirty = function() {
+        const tab = openTabs.find(t => t.path === activeTabPath);
+        if (tab && tab.isScene) {
+            const currentVal = window.sceneEditor.serialize();
+            tab.currentSceneContent = currentVal; // cache active scene state
+            const isDirty = currentVal !== tab.originalContent;
+            if (tab.isDirty !== isDirty) {
+                tab.isDirty = isDirty;
+                renderTabs();
+            }
+        }
+    };
+
+    // 14. Start connection heartbeat checks to auto-close when server shuts down (Ctrl+C)
     startHeartbeat();
 });
 

@@ -524,7 +524,173 @@ const server = http.createServer(async (req, res) => {
     }
 });
 
-server.listen(PORT, () => {
+// Automatically create low-poly models in assets/ folder if not present
+async function ensureAssetsDirectoryAndFiles() {
+    const assetsDir = path.join(WORKSPACE_DIR, 'assets');
+    try {
+        await fs.mkdir(assetsDir, { recursive: true });
+        
+        // 1. tree.obj
+        const treePath = path.join(assetsDir, 'tree.obj');
+        try {
+            await fs.access(treePath);
+        } catch (e) {
+            const treeContent = generateTreeObj();
+            await fs.writeFile(treePath, treeContent, 'utf8');
+        }
+
+        // 2. rock.obj
+        const rockPath = path.join(assetsDir, 'rock.obj');
+        try {
+            await fs.access(rockPath);
+        } catch (e) {
+            const rockContent = generateRockObj();
+            await fs.writeFile(rockPath, rockContent, 'utf8');
+        }
+
+        // 3. crate.obj
+        const cratePath = path.join(assetsDir, 'crate.obj');
+        try {
+            await fs.access(cratePath);
+        } catch (e) {
+            const crateContent = generateCrateObj();
+            await fs.writeFile(cratePath, crateContent, 'utf8');
+        }
+    } catch (err) {
+        console.error('[Assets Startup Loader] Error generating default assets:', err.message);
+    }
+}
+
+function generateCrateObj() {
+    return `# Generated Crate OBJ
+v -0.5 -0.5 -0.5
+v 0.5 -0.5 -0.5
+v 0.5 0.5 -0.5
+v -0.5 0.5 -0.5
+v -0.5 -0.5 0.5
+v 0.5 -0.5 0.5
+v 0.5 0.5 0.5
+v -0.5 0.5 0.5
+f 1 2 3 4
+f 5 6 7 8
+f 1 5 8 4
+f 2 6 7 3
+f 3 7 8 4
+f 1 2 6 5
+`;
+}
+
+function generateTreeObj() {
+    let vertices = [];
+    let faces = [];
+    const segments = 6;
+    const trunkHeight = 1.5;
+    const trunkRadius = 0.15;
+    for (let i = 0; i < segments; i++) {
+        let angle = (i / segments) * Math.PI * 2;
+        vertices.push([Math.cos(angle) * trunkRadius, 0, Math.sin(angle) * trunkRadius]);
+    }
+    for (let i = 0; i < segments; i++) {
+        let angle = (i / segments) * Math.PI * 2;
+        vertices.push([Math.cos(angle) * trunkRadius, trunkHeight, Math.sin(angle) * trunkRadius]);
+    }
+    for (let i = 0; i < segments; i++) {
+        let n1 = i + 1;
+        let n2 = ((i + 1) % segments) + 1;
+        let n3 = n2 + segments;
+        let n4 = n1 + segments;
+        faces.push([n1, n2, n3, n4]);
+    }
+    let f1BaseIdx = vertices.length + 1;
+    const f1Radius = 0.6;
+    const f1BaseY = trunkHeight - 0.2;
+    const f1TopY = trunkHeight + 1.2;
+    for (let i = 0; i < segments; i++) {
+        let angle = (i / segments) * Math.PI * 2;
+        vertices.push([Math.cos(angle) * f1Radius, f1BaseY, Math.sin(angle) * f1Radius]);
+    }
+    vertices.push([0, f1TopY, 0]);
+    let f1TopIdx = vertices.length;
+    for (let i = 0; i < segments; i++) {
+        let b1 = f1BaseIdx + i;
+        let b2 = f1BaseIdx + ((i + 1) % segments);
+        faces.push([b1, b2, f1TopIdx]);
+    }
+    let f1Cap = [];
+    for (let i = segments - 1; i >= 0; i--) {
+        f1Cap.push(f1BaseIdx + i);
+    }
+    faces.push(f1Cap);
+    let f2BaseIdx = vertices.length + 1;
+    const f2Radius = 0.45;
+    const f2BaseY = trunkHeight + 0.5;
+    const f2TopY = trunkHeight + 2.0;
+    for (let i = 0; i < segments; i++) {
+        let angle = (i / segments) * Math.PI * 2;
+        vertices.push([Math.cos(angle) * f2Radius, f2BaseY, Math.sin(angle) * f2Radius]);
+    }
+    vertices.push([0, f2TopY, 0]);
+    let f2TopIdx = vertices.length;
+    for (let i = 0; i < segments; i++) {
+        let b1 = f2BaseIdx + i;
+        let b2 = f2BaseIdx + ((i + 1) % segments);
+        faces.push([b1, b2, f2TopIdx]);
+    }
+    let f2Cap = [];
+    for (let i = segments - 1; i >= 0; i--) {
+        f2Cap.push(f2BaseIdx + i);
+    }
+    faces.push(f2Cap);
+    let lines = ["# Generated Low-Poly Tree OBJ"];
+    for (let v of vertices) {
+        lines.push(`v ${v[0].toFixed(4)} ${v[1].toFixed(4)} ${v[2].toFixed(4)}`);
+    }
+    for (let f of faces) {
+        lines.push(`f ${f.join(' ')}`);
+    }
+    return lines.join('\n');
+}
+
+function generateRockObj() {
+    let vertices = [
+        [0, 0.6, 0],
+        [0.4, 0.1, 0.4],
+        [-0.3, 0.2, 0.5],
+        [-0.4, 0.1, -0.3],
+        [0.3, 0.2, -0.4],
+        [0, -0.5, 0],
+        [0.5, -0.1, 0],
+        [0, 0.1, 0.5],
+        [-0.5, -0.1, -0.1],
+        [0.1, -0.2, -0.5]
+    ];
+    let faces = [
+        [1, 2, 7], [1, 7, 3], [1, 3, 8], [1, 8, 4], [1, 4, 9], [1, 9, 2],
+        [6, 7, 2], [6, 3, 7], [6, 8, 3], [6, 4, 8], [6, 9, 4], [6, 2, 9],
+        [2, 10, 7], [7, 10, 3], [3, 10, 8], [8, 10, 4], [4, 10, 9], [9, 10, 2]
+    ];
+    let rng = 0.12345;
+    function nextRand() {
+        rng = (rng * 9301 + 49297) % 233280;
+        return rng / 233280;
+    }
+    for (let i = 0; i < vertices.length; i++) {
+        vertices[i][0] += (nextRand() - 0.5) * 0.15;
+        vertices[i][1] += (nextRand() - 0.5) * 0.15;
+        vertices[i][2] += (nextRand() - 0.5) * 0.15;
+    }
+    let lines = ["# Generated Rock OBJ"];
+    for (let v of vertices) {
+        lines.push(`v ${v[0].toFixed(4)} ${v[1].toFixed(4)} ${v[2].toFixed(4)}`);
+    }
+    for (let f of faces) {
+        lines.push(`f ${f.join(' ')}`);
+    }
+    return lines.join('\n');
+}
+
+server.listen(PORT, async () => {
+    await ensureAssetsDirectoryAndFiles();
     console.log('=========================================================');
     console.log(`   E P I L E P S Y L A N G   V S   I D E   (J A V A S C R I P T)`);
     console.log(`   Listening on: http://localhost:${PORT}`);

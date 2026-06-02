@@ -1,0 +1,36 @@
+# Automated Scene Parser and Renderer Test
+win = gameWindow3D("Level Loading Test", 800, 600)
+
+# Create a test scene file programmatically
+sceneContent = "# EpilepsyLang Scene File\n"
+sceneContent = sceneContent + "grid 0 0 30 2 gray\n"
+sceneContent = sceneContent + "cube 0 1.0 0 4.0 2.0 1.0 red\n"
+sceneContent = sceneContent + "tree -3 0 -3 2.0 1.5\n"
+sceneContent = sceneContent + "model 3 0 3 1.5 1.5 1.5 0 0.5 0 assets/rock.obj yellow\n"
+
+print("Writing my_temp_map.epscene...")
+writeFile("my_temp_map.epscene", sceneContent)
+
+print("Loading scene into 3D engine...")
+win.loadScene("my_temp_map.epscene")
+
+# Initial camera view
+win.setCamera(0, 4, -8, -0.4, 0)
+
+print("Rendering 100 frames...")
+frame = 0
+while (frame < 100 and win.isOpen()) {
+    win.clear("black")
+    
+    # Let's rotate the camera slightly for a cool cinematic effect
+    win.rotateCamera(0, 0.005)
+    
+    win.render3D()
+    frame = frame + 1
+    sleep(16)
+}
+
+win.close()
+print("====================================================")
+print("Scene parsed and rendered 100 frames successfully!")
+print("====================================================")
