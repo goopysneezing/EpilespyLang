@@ -1,0 +1,32 @@
+# EpilepsyLang Equation Solver Success Tests
+
+print("=== 1. Test 2x2 Linear System ===")
+# Solve:
+# 2*x + y = 10
+# x - y = 2
+# Expected: [4, 2]
+sol2 = solve(["2*x + y == 10", "x - y == 2"], ["x", "y"])
+print("Linear 2x2 x:", sol2[0], "y:", sol2[1])
+
+
+print("\n=== 2. Test 3x3 Linear System ===")
+# Solve:
+# x + y - z = 4
+# 2*x + y + z = 9
+# x - y + 2*z = 3
+# Expected: [3, 2, 1]
+sol3 = solve(["x + y - z == 4", "2*x + y + z == 9", "x - y + 2*z == 3"], ["x", "y", "z"])
+print("Linear 3x3 x:", sol3[0], "y:", sol3[1], "z:", sol3[2])
+
+
+print("\n=== 3. Test Non-linear System (Circle & Parabola Intersection) ===")
+# Solve:
+# x^2 + y^2 = 25
+# y = x^2 - 5
+# Expected: [3, 4] with guess [2, 3]
+sol_nl1 = solve(["x*x + y*y == 25", "y == x*x - 5"], ["x", "y"], [2.0, 3.0])
+print("Non-linear sol 1 (guess [2, 3]) -> x:", sol_nl1[0], "y:", sol_nl1[1])
+
+# Expected: [-3, 4] with guess [-2, 3]
+sol_nl2 = solve(["x*x + y*y == 25", "y == x*x - 5"], ["x", "y"], [-2.0, 3.0])
+print("Non-linear sol 2 (guess [-2, 3]) -> x:", sol_nl2[0], "y:", sol_nl2[1])

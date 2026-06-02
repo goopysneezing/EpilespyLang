@@ -12,10 +12,40 @@
 #include "ast.hpp"
 #include "value.hpp"
 #include "environment.hpp"
+#include "database.hpp"
 #include <wininet.h>
 #include <fstream>
 #include <sstream>
 #include <filesystem>
+#include <limits>
+
+inline Complex toComplex(const Value& val) {
+    if (val.isComplex()) return val.asComplex();
+    if (val.isNumber()) return Complex(val.asNumber(), 0.0);
+    throw std::runtime_error("Cannot convert type '" + val.typeString() + "' to complex number.");
+}
+
+inline Complex operator+(const Complex& lhs, const Complex& rhs) {
+    return Complex(lhs.real + rhs.real, lhs.imag + rhs.imag);
+}
+inline Complex operator-(const Complex& lhs, const Complex& rhs) {
+    return Complex(lhs.real - rhs.real, lhs.imag - rhs.imag);
+}
+inline Complex operator*(const Complex& lhs, const Complex& rhs) {
+    return Complex(lhs.real * rhs.real - lhs.imag * rhs.imag,
+                   lhs.real * rhs.imag + lhs.imag * rhs.real);
+}
+inline Complex operator/(const Complex& lhs, const Complex& rhs) {
+    double denom = rhs.real * rhs.real + rhs.imag * rhs.imag;
+    if (denom == 0.0) {
+        throw std::runtime_error("Division by zero in complex numbers.");
+    }
+    return Complex((lhs.real * rhs.real + lhs.imag * rhs.imag) / denom,
+                   (lhs.imag * rhs.real - lhs.real * rhs.imag) / denom);
+}
+inline Complex operator-(const Complex& c) {
+    return Complex(-c.real, -c.imag);
+}
 
 inline std::string cleanFilePath(const std::string& path) {
     std::string clean = path;
@@ -123,6 +153,15 @@ public:
         environment->define("sqrt2", Value(1.41421356237309504880));
         environment->define("ln2", Value(0.693147180559945309417));
         environment->define("ln10", Value(2.30258509299404568402));
+        environment->define("i", Value(Complex(0.0, 1.0)));
+        environment->define("infinity", Value(std::numeric_limits<double>::infinity()));
+        environment->define("inf", Value(std::numeric_limits<double>::infinity()));
+        environment->define("nan", Value(std::numeric_limits<double>::quiet_NaN()));
+        environment->define("phi", Value(1.61803398874989484820));
+        environment->define("gold", Value(1.61803398874989484820));
+        environment->define("gamma", Value(0.57721566490153286060));
+        environment->define("catalan", Value(0.91596559417721901505));
+        environment->define("apery", Value(1.20205690315959428540));
     }
 
     std::shared_ptr<Environment> getGlobals() const {
@@ -196,23 +235,51 @@ public:
 
         switch (expr->op.type) {
             case TokenType::PLUS:
+                if (left.isComplex() || right.isComplex()) {
+                    try {
+                        return Value(toComplex(left) + toComplex(right));
+                    } catch (const std::exception& e) {
+                        throw RuntimeError(expr->op.line, e.what());
+                    }
+                }
                 if (left.isNumber() && right.isNumber()) {
                     return left.asNumber() + right.asNumber();
                 }
                 if (left.isString() || right.isString()) {
                     return left.toString() + right.toString();
                 }
-                throw RuntimeError(expr->op.line, "Operands must be numbers or strings for '+'.");
+                throw RuntimeError(expr->op.line, "Operands must be numbers, complex, or strings for '+'.");
                 
             case TokenType::MINUS:
+                if (left.isComplex() || right.isComplex()) {
+                    try {
+                        return Value(toComplex(left) - toComplex(right));
+                    } catch (const std::exception& e) {
+                        throw RuntimeError(expr->op.line, e.what());
+                    }
+                }
                 checkNumberOperands(expr->op, left, right);
                 return left.asNumber() - right.asNumber();
                 
             case TokenType::STAR:
+                if (left.isComplex() || right.isComplex()) {
+                    try {
+                        return Value(toComplex(left) * toComplex(right));
+                    } catch (const std::exception& e) {
+                        throw RuntimeError(expr->op.line, e.what());
+                    }
+                }
                 checkNumberOperands(expr->op, left, right);
                 return left.asNumber() * right.asNumber();
                 
             case TokenType::SLASH:
+                if (left.isComplex() || right.isComplex()) {
+                    try {
+                        return Value(toComplex(left) / toComplex(right));
+                    } catch (const std::exception& e) {
+                        throw RuntimeError(expr->op.line, e.what());
+                    }
+                }
                 checkNumberOperands(expr->op, left, right);
                 if (right.asNumber() == 0.0) {
                     throw RuntimeError(expr->op.line, "Division by zero.");
@@ -259,8 +326,11 @@ public:
         Value right = evaluate(expr->right);
         switch (expr->op.type) {
             case TokenType::MINUS:
+                if (right.isComplex()) {
+                    return Value(-right.asComplex());
+                }
                 if (!right.isNumber()) {
-                    throw RuntimeError(expr->op.line, "Operand must be a number for unary '-'.");
+                    throw RuntimeError(expr->op.line, "Operand must be a number or complex for unary '-'.");
                 }
                 return -right.asNumber();
             case TokenType::NOT:
@@ -314,7 +384,10 @@ public:
             if (val.isArray()) {
                 return Value(static_cast<double>(val.asArray()->size()));
             }
-            throw RuntimeError(expr->callee.line, "len() argument must be string or array.");
+            if (val.isTable()) {
+                return Value(static_cast<double>(val.asTable()->rows.size()));
+            }
+            throw RuntimeError(expr->callee.line, "len() argument must be string, array, or table.");
         }
 
         if (calleeName == "num") {
@@ -375,6 +448,245 @@ public:
                 throw RuntimeError(expr->callee.line, "type() expects exactly 1 argument.");
             }
             return Value(args[0].typeString());
+        }
+
+        if (calleeName == "database") {
+            if (args.size() != 1) {
+                throw RuntimeError(expr->callee.line, "database() expects exactly 1 argument (path).");
+            }
+            if (!args[0].isString()) {
+                throw RuntimeError(expr->callee.line, "database() argument must be a string file path.");
+            }
+            try {
+                auto db = std::make_shared<DatabaseInstance>(args[0].asString());
+                return Value(db);
+            } catch (const std::exception& e) {
+                throw RuntimeError(expr->callee.line, std::string("Failed to initialize database: ") + e.what());
+            }
+        }
+
+        if (calleeName == "solve") {
+            if (args.size() < 2 || args.size() > 3) {
+                throw RuntimeError(expr->callee.line, "solve() expects 2 or 3 arguments: (equations_array, variables_array, [initial_guesses_array]).");
+            }
+            if (!args[0].isArray()) {
+                throw RuntimeError(expr->callee.line, "First argument to solve() must be an array of equation strings.");
+            }
+            if (!args[1].isArray()) {
+                throw RuntimeError(expr->callee.line, "Second argument to solve() must be an array of variable names (strings).");
+            }
+
+            auto equationsArray = args[0].asArray();
+            auto variablesArray = args[1].asArray();
+
+            if (equationsArray->size() != variablesArray->size()) {
+                throw RuntimeError(expr->callee.line, "Number of equations (" + std::to_string(equationsArray->size()) + 
+                                   ") must match the number of variables (" + std::to_string(variablesArray->size()) + ").");
+            }
+
+            size_t n = equationsArray->size();
+            if (n == 0) {
+                throw RuntimeError(expr->callee.line, "System of equations cannot be empty.");
+            }
+
+            std::vector<std::string> varNames;
+            for (size_t i = 0; i < n; ++i) {
+                Value varVal = (*variablesArray)[i];
+                if (!varVal.isString()) {
+                    throw RuntimeError(expr->callee.line, "Variable name at index " + std::to_string(i) + " must be a string.");
+                }
+                std::string varName = varVal.asString();
+                if (std::find(varNames.begin(), varNames.end(), varName) != varNames.end()) {
+                    throw RuntimeError(expr->callee.line, "Variable name '" + varName + "' is duplicated.");
+                }
+                varNames.push_back(varName);
+            }
+
+            std::vector<double> x(n, 1.0);
+            if (args.size() == 3) {
+                if (!args[2].isArray()) {
+                    throw RuntimeError(expr->callee.line, "Third argument to solve() must be an array of initial guesses (numbers).");
+                }
+                auto guessesArray = args[2].asArray();
+                if (guessesArray->size() != n) {
+                    throw RuntimeError(expr->callee.line, "Initial guesses array size (" + std::to_string(guessesArray->size()) + 
+                                       ") must match the number of variables (" + std::to_string(n) + ").");
+                }
+                for (size_t i = 0; i < n; ++i) {
+                    Value guessVal = (*guessesArray)[i];
+                    if (!guessVal.isNumber()) {
+                        throw RuntimeError(expr->callee.line, "Initial guess at index " + std::to_string(i) + " must be a number.");
+                    }
+                    x[i] = guessVal.asNumber();
+                }
+            }
+
+            std::vector<ExprPtr> eqExprs;
+            for (size_t i = 0; i < n; ++i) {
+                Value eqVal = (*equationsArray)[i];
+                if (!eqVal.isString()) {
+                    throw RuntimeError(expr->callee.line, "Equation at index " + std::to_string(i) + " must be a string.");
+                }
+                std::string eqStr = eqVal.asString();
+                try {
+                    Lexer eqLexer(eqStr);
+                    auto eqTokens = eqLexer.scanTokens();
+                    Parser eqParser(eqTokens);
+                    auto eqStatements = eqParser.parse();
+                    if (eqStatements.empty()) {
+                        throw std::runtime_error("Equation is empty.");
+                    }
+                    auto exprStmt = std::dynamic_pointer_cast<ExpressionStmt>(eqStatements[0]);
+                    if (!exprStmt) {
+                        throw std::runtime_error("Equation must be an expression.");
+                    }
+                    ExprPtr eqExpr = exprStmt->expression;
+
+                    // If it is a binary comparison (==), transform to LHS - RHS
+                    if (auto binExpr = std::dynamic_pointer_cast<BinaryExpr>(eqExpr)) {
+                        if (binExpr->op.type == TokenType::EQUAL_EQUAL) {
+                            Token opMinus = binExpr->op;
+                            opMinus.type = TokenType::MINUS;
+                            opMinus.lexeme = "-";
+                            eqExpr = std::make_shared<BinaryExpr>(binExpr->left, opMinus, binExpr->right);
+                        }
+                    }
+                    eqExprs.push_back(eqExpr);
+                } catch (const ParseError& pe) {
+                    throw RuntimeError(expr->callee.line, "Equation " + std::to_string(i + 1) + " syntax error: " + pe.what());
+                } catch (const std::exception& ex) {
+                    throw RuntimeError(expr->callee.line, "Equation " + std::to_string(i + 1) + " parsing error: " + ex.what());
+                }
+            }
+
+            const int maxIterations = 100;
+            const double tolerance = 1e-11;
+            const double epsilon = 1e-7;
+            bool converged = false;
+
+            for (int iter = 0; iter < maxIterations; ++iter) {
+                // 1. Evaluate F(X)
+                std::vector<double> F(n, 0.0);
+                auto tempEnv = std::make_shared<Environment>(this->environment);
+                for (size_t j = 0; j < n; ++j) {
+                    tempEnv->define(varNames[j], Value(x[j]));
+                }
+
+                auto prevEnv = this->environment;
+                try {
+                    this->environment = tempEnv;
+                    for (size_t i = 0; i < n; ++i) {
+                        Value val = evaluate(eqExprs[i]);
+                        if (!val.isNumber()) {
+                            throw RuntimeError(expr->callee.line, "Equation " + std::to_string(i + 1) + " did not evaluate to a number.");
+                        }
+                        F[i] = val.asNumber();
+                    }
+                    this->environment = prevEnv;
+                } catch (...) {
+                    this->environment = prevEnv;
+                    throw;
+                }
+
+                // Check convergence
+                double maxF = 0.0;
+                for (double f_val : F) {
+                    maxF = (std::max)(maxF, std::abs(f_val));
+                }
+                if (maxF < tolerance) {
+                    converged = true;
+                    break;
+                }
+
+                // 2. Compute Jacobian matrix J
+                std::vector<std::vector<double>> J(n, std::vector<double>(n, 0.0));
+                for (size_t j = 0; j < n; ++j) {
+                    std::vector<double> x_perturbed = x;
+                    x_perturbed[j] += epsilon;
+
+                    auto pertEnv = std::make_shared<Environment>(prevEnv);
+                    for (size_t k = 0; k < n; ++k) {
+                        pertEnv->define(varNames[k], Value(x_perturbed[k]));
+                    }
+
+                    try {
+                        this->environment = pertEnv;
+                        for (size_t i = 0; i < n; ++i) {
+                            Value val = evaluate(eqExprs[i]);
+                            if (!val.isNumber()) {
+                                throw RuntimeError(expr->callee.line, "Equation " + std::to_string(i + 1) + " did not evaluate to a number during Jacobian calculation.");
+                            }
+                            J[i][j] = (val.asNumber() - F[i]) / epsilon;
+                        }
+                        this->environment = prevEnv;
+                    } catch (...) {
+                        this->environment = prevEnv;
+                        throw;
+                    }
+                }
+
+                // 3. Solve J * delta_x = -F using Gaussian Elimination with partial pivoting
+                std::vector<double> rhs(n);
+                for (size_t i = 0; i < n; ++i) rhs[i] = -F[i];
+
+                for (size_t k = 0; k < n; ++k) {
+                    // Pivot selection
+                    size_t pivot_row = k;
+                    double max_val = std::abs(J[k][k]);
+                    for (size_t i = k + 1; i < n; ++i) {
+                        if (std::abs(J[i][k]) > max_val) {
+                            max_val = std::abs(J[i][k]);
+                            pivot_row = i;
+                        }
+                    }
+
+                    if (max_val < 1e-12) {
+                        throw RuntimeError(expr->callee.line, "System of equations is singular or underdetermined (no unique solution exists).");
+                    }
+
+                    if (pivot_row != k) {
+                        std::swap(J[k], J[pivot_row]);
+                        std::swap(rhs[k], rhs[pivot_row]);
+                    }
+
+                    // Elimination
+                    for (size_t i = k + 1; i < n; ++i) {
+                        double factor = J[i][k] / J[k][k];
+                        for (size_t c = k; c < n; ++c) {
+                            J[i][c] -= factor * J[k][c];
+                        }
+                        rhs[i] -= factor * rhs[k];
+                    }
+                }
+
+                // Back substitution
+                std::vector<double> delta_x(n, 0.0);
+                for (int i = static_cast<int>(n) - 1; i >= 0; --i) {
+                    double val = rhs[i];
+                    for (size_t c = i + 1; c < n; ++c) {
+                        val -= J[i][c] * delta_x[c];
+                    }
+                    delta_x[i] = val / J[i][i];
+                }
+
+                // Update X
+                for (size_t i = 0; i < n; ++i) {
+                    x[i] += delta_x[i];
+                    if (std::isnan(x[i]) || std::isinf(x[i])) {
+                        throw RuntimeError(expr->callee.line, "Solver encountered divergent or invalid value (NaN/Inf). Try providing better initial guesses.");
+                    }
+                }
+            }
+
+            if (!converged) {
+                throw RuntimeError(expr->callee.line, "Solver failed to converge after " + std::to_string(maxIterations) + " iterations.");
+            }
+
+            auto results = std::make_shared<std::vector<Value>>();
+            for (double solVal : x) {
+                results->push_back(Value(solVal));
+            }
+            return Value(results);
         }
 
         if (calleeName == "window") {
@@ -499,12 +811,26 @@ public:
             return Value(std::tanh(args[0].asNumber()));
         }
         if (calleeName == "sqrt") {
-            checkNumArgs("sqrt", 1);
-            double val = args[0].asNumber();
-            if (val < 0.0) {
-                throw RuntimeError(expr->callee.line, "sqrt() argument must be non-negative.");
+            if (args.size() != 1) {
+                throw RuntimeError(expr->callee.line, "sqrt() expects exactly 1 argument.");
             }
-            return Value(std::sqrt(val));
+            Value val = args[0];
+            if (val.isComplex()) {
+                Complex c = val.asComplex();
+                double r = std::hypot(c.real, c.imag);
+                double theta = std::atan2(c.imag, c.real);
+                return Value(Complex(std::sqrt(r) * std::cos(theta / 2.0),
+                                     std::sqrt(r) * std::sin(theta / 2.0)));
+            }
+            if (val.isNumber()) {
+                double d = val.asNumber();
+                if (d >= 0.0) {
+                    return Value(std::sqrt(d));
+                } else {
+                    return Value(Complex(0.0, std::sqrt(-d)));
+                }
+            }
+            throw RuntimeError(expr->callee.line, "sqrt() argument must be a number or complex.");
         }
         if (calleeName == "cbrt") {
             checkNumArgs("cbrt", 1);
@@ -543,8 +869,54 @@ public:
             return Value(std::log2(val));
         }
         if (calleeName == "abs") {
-            checkNumArgs("abs", 1);
-            return Value(std::abs(args[0].asNumber()));
+            if (args.size() != 1) {
+                throw RuntimeError(expr->callee.line, "abs() expects exactly 1 argument.");
+            }
+            Value val = args[0];
+            if (val.isComplex()) {
+                Complex c = val.asComplex();
+                return Value(std::hypot(c.real, c.imag));
+            }
+            if (val.isNumber()) {
+                return Value(std::abs(val.asNumber()));
+            }
+            throw RuntimeError(expr->callee.line, "abs() argument must be a number or complex.");
+        }
+        if (calleeName == "real") {
+            if (args.size() != 1) {
+                throw RuntimeError(expr->callee.line, "real() expects exactly 1 argument.");
+            }
+            Value val = args[0];
+            if (val.isComplex()) return Value(val.asComplex().real);
+            if (val.isNumber()) return Value(val.asNumber());
+            throw RuntimeError(expr->callee.line, "real() argument must be a number or complex.");
+        }
+        if (calleeName == "imag") {
+            if (args.size() != 1) {
+                throw RuntimeError(expr->callee.line, "imag() expects exactly 1 argument.");
+            }
+            Value val = args[0];
+            if (val.isComplex()) return Value(val.asComplex().imag);
+            if (val.isNumber()) return Value(0.0);
+            throw RuntimeError(expr->callee.line, "imag() argument must be a number or complex.");
+        }
+        if (calleeName == "conj") {
+            if (args.size() != 1) {
+                throw RuntimeError(expr->callee.line, "conj() expects exactly 1 argument.");
+            }
+            Value val = args[0];
+            if (val.isComplex()) return Value(Complex(val.asComplex().real, -val.asComplex().imag));
+            if (val.isNumber()) return Value(val.asNumber());
+            throw RuntimeError(expr->callee.line, "conj() argument must be a number or complex.");
+        }
+        if (calleeName == "arg") {
+            if (args.size() != 1) {
+                throw RuntimeError(expr->callee.line, "arg() expects exactly 1 argument.");
+            }
+            Value val = args[0];
+            if (val.isComplex()) return Value(std::atan2(val.asComplex().imag, val.asComplex().real));
+            if (val.isNumber()) return Value(val.asNumber() >= 0.0 ? 0.0 : 3.14159265358979323846);
+            throw RuntimeError(expr->callee.line, "arg() argument must be a number or complex.");
         }
         if (calleeName == "ceil") {
             checkNumArgs("ceil", 1);
@@ -1169,8 +1541,15 @@ public:
             }
             return Value(std::string(1, str[idx]));
         }
+        if (target.isTable()) {
+            auto tbl = target.asTable();
+            if (idx < 0 || idx >= static_cast<int>(tbl->rows.size())) {
+                throw RuntimeError(expr->bracket.line, "Table row index " + std::to_string(idx) + " out of bounds (size " + std::to_string(tbl->rows.size()) + ").");
+            }
+            return Value(tbl->rows[idx]);
+        }
 
-        throw RuntimeError(expr->bracket.line, "Only arrays and strings can be indexed.");
+        throw RuntimeError(expr->bracket.line, "Only arrays, strings, and tables can be indexed.");
     }
 
     Value visitIndexAssignmentExpr(IndexAssignmentExpr* expr) override {
@@ -1548,9 +1927,51 @@ public:
                 return obj;
             }
             throw RuntimeError(expr->method.line, "Unknown method '" + methodName + "' on form object.");
+        } else if (obj.isDatabase()) {
+            auto db = obj.asDatabase();
+            if (methodName == "query") {
+                if (args.size() != 1) {
+                    throw RuntimeError(expr->method.line, "query() expects exactly 1 argument (SQL query).");
+                }
+                if (!args[0].isString()) {
+                    throw RuntimeError(expr->method.line, "query() argument must be a string containing SQL.");
+                }
+                try {
+                    return db->query(args[0].asString());
+                } catch (const std::exception& e) {
+                    throw RuntimeError(expr->method.line, e.what());
+                }
+            }
+            throw RuntimeError(expr->method.line, "Unknown method '" + methodName + "' on database object.");
         }
 
-        throw RuntimeError(expr->method.line, "Only window, sound, and form objects support method calls.");
+        throw RuntimeError(expr->method.line, "Only window, sound, form, and database objects support method calls (attempted method call '" + methodName + "' on type '" + obj.typeString() + "').");
+    }
+
+    Value visitPropertyAccessExpr(PropertyAccessExpr* expr) override {
+        Value obj = evaluate(expr->object);
+        std::string propName = expr->property.lexeme;
+
+        if (obj.isEntry()) {
+            auto entry = obj.asEntry();
+            bool found = false;
+            for (size_t i = 0; i < entry->columns.size(); ++i) {
+                if (entry->columns[i] == propName) {
+                    found = true;
+                    return entry->values[i];
+                }
+            }
+            if (!found) {
+                std::string cols = "";
+                for (size_t i = 0; i < entry->columns.size(); ++i) {
+                    if (i > 0) cols += ", ";
+                    cols += "'" + entry->columns[i] + "'";
+                }
+                throw RuntimeError(expr->property.line, "Column '" + propName + "' does not exist in the database entry. Available columns: [" + cols + "].");
+            }
+        }
+
+        throw RuntimeError(expr->property.line, "Only database entry objects support property access (attempted property access '" + propName + "' on type '" + obj.typeString() + "').");
     }
 
     // StmtVisitor implementation

@@ -10,13 +10,29 @@
 #include "window.hpp"
 #include "sound.hpp"
 
+struct Complex {
+    double real;
+    double imag;
+    Complex(double r = 0.0, double i = 0.0) : real(r), imag(i) {}
+    bool operator==(const Complex& other) const {
+        return real == other.real && imag == other.imag;
+    }
+};
+
 // Forward declarations
 struct Value;
+class DatabaseInstance;
+class TableInstance;
+class EntryInstance;
+
 using ValueArray = std::shared_ptr<std::vector<Value>>;
 using WindowPtr = std::shared_ptr<WindowInstance>;
 using SoundPtr = std::shared_ptr<SoundInstance>;
 class FormInstance;
 using FormPtr = std::shared_ptr<FormInstance>;
+using DatabasePtr = std::shared_ptr<DatabaseInstance>;
+using TablePtr = std::shared_ptr<TableInstance>;
+using EntryPtr = std::shared_ptr<EntryInstance>;
 
 class RuntimeError : public std::runtime_error {
 public:
@@ -32,7 +48,7 @@ struct Nil {
 
 class Value {
 public:
-    std::variant<Nil, bool, double, std::string, ValueArray, WindowPtr, SoundPtr, FormPtr> asVariant;
+    std::variant<Nil, bool, double, std::string, ValueArray, WindowPtr, SoundPtr, FormPtr, DatabasePtr, TablePtr, EntryPtr, Complex> asVariant;
 
     Value() : asVariant(Nil{}) {}
     Value(Nil) : asVariant(Nil{}) {}
@@ -44,6 +60,10 @@ public:
     Value(WindowPtr win) : asVariant(win) {}
     Value(SoundPtr snd) : asVariant(snd) {}
     Value(FormPtr frm) : asVariant(frm) {}
+    Value(DatabasePtr db) : asVariant(db) {}
+    Value(TablePtr tbl) : asVariant(tbl) {}
+    Value(EntryPtr entry) : asVariant(entry) {}
+    Value(Complex c) : asVariant(c) {}
 
     bool isNil() const { return std::holds_alternative<Nil>(asVariant); }
     bool isBool() const { return std::holds_alternative<bool>(asVariant); }
@@ -53,6 +73,10 @@ public:
     bool isWindow() const { return std::holds_alternative<WindowPtr>(asVariant); }
     bool isSound() const { return std::holds_alternative<SoundPtr>(asVariant); }
     bool isForm() const { return std::holds_alternative<FormPtr>(asVariant); }
+    bool isDatabase() const { return std::holds_alternative<DatabasePtr>(asVariant); }
+    bool isTable() const { return std::holds_alternative<TablePtr>(asVariant); }
+    bool isEntry() const { return std::holds_alternative<EntryPtr>(asVariant); }
+    bool isComplex() const { return std::holds_alternative<Complex>(asVariant); }
 
     bool asBool() const { return std::get<bool>(asVariant); }
     double asNumber() const { return std::get<double>(asVariant); }
@@ -61,6 +85,10 @@ public:
     WindowPtr asWindow() const { return std::get<WindowPtr>(asVariant); }
     SoundPtr asSound() const { return std::get<SoundPtr>(asVariant); }
     FormPtr asForm() const { return std::get<FormPtr>(asVariant); }
+    DatabasePtr asDatabase() const { return std::get<DatabasePtr>(asVariant); }
+    TablePtr asTable() const { return std::get<TablePtr>(asVariant); }
+    EntryPtr asEntry() const { return std::get<EntryPtr>(asVariant); }
+    Complex asComplex() const { return std::get<Complex>(asVariant); }
 
     bool isTruthy() const {
         if (isNil()) return false;
@@ -71,6 +99,10 @@ public:
         if (isWindow()) return true;
         if (isSound()) return true;
         if (isForm()) return true;
+        if (isDatabase()) return true;
+        if (isTable()) return true;
+        if (isEntry()) return true;
+        if (isComplex()) return asComplex().real != 0.0 || asComplex().imag != 0.0;
         return true;
     }
 
@@ -79,6 +111,8 @@ public:
         if (isBool()) return asBool() ? "true" : "false";
         if (isNumber()) {
             double d = asNumber();
+            if (std::isnan(d)) return "nan";
+            if (std::isinf(d)) return "infinity";
             if (std::floor(d) == d) {
                 return std::to_string(static_cast<long long>(d));
             }
@@ -90,6 +124,42 @@ public:
         if (isWindow()) return "<window>";
         if (isSound()) return "<sound>";
         if (isForm()) return "<form>";
+        if (isDatabase()) return "<database>";
+        if (isTable()) return "<table>";
+        if (isEntry()) return "<entry>";
+        if (isComplex()) {
+            Complex c = asComplex();
+            if (std::isnan(c.real) || std::isnan(c.imag)) return "nan";
+            if (std::isinf(c.real) || std::isinf(c.imag)) return "infinity";
+            if (c.imag == 0.0) {
+                double d = c.real;
+                if (std::floor(d) == d) {
+                    return std::to_string(static_cast<long long>(d));
+                }
+                std::ostringstream ss;
+                ss << std::setprecision(14) << d;
+                return ss.str();
+            }
+            std::ostringstream ss;
+            ss << std::setprecision(14);
+            if (c.real != 0.0) {
+                ss << c.real;
+                if (c.imag > 0.0) {
+                    ss << " + ";
+                    if (c.imag != 1.0) ss << c.imag;
+                    ss << "i";
+                } else {
+                    ss << " - ";
+                    if (c.imag != -1.0) ss << -c.imag;
+                    ss << "i";
+                }
+            } else {
+                if (c.imag == 1.0) ss << "i";
+                else if (c.imag == -1.0) ss << "-i";
+                else ss << c.imag << "i";
+            }
+            return ss.str();
+        }
         if (isArray()) {
             std::string res = "[";
             auto arr = asArray();
@@ -116,6 +186,10 @@ public:
         if (isWindow()) return "window";
         if (isSound()) return "sound";
         if (isForm()) return "form";
+        if (isDatabase()) return "database";
+        if (isTable()) return "table";
+        if (isEntry()) return "entry";
+        if (isComplex()) return "complex";
         return "unknown";
     }
 };
@@ -129,6 +203,10 @@ inline bool valuesEqual(const Value& a, const Value& b) {
     if (a.isWindow()) return a.asWindow() == b.asWindow();
     if (a.isSound()) return a.asSound() == b.asSound();
     if (a.isForm()) return a.asForm() == b.asForm();
+    if (a.isDatabase()) return a.asDatabase() == b.asDatabase();
+    if (a.isTable()) return a.asTable() == b.asTable();
+    if (a.isEntry()) return a.asEntry() == b.asEntry();
+    if (a.isComplex()) return a.asComplex() == b.asComplex();
     if (a.isArray()) {
         auto arrA = a.asArray();
         auto arrB = b.asArray();

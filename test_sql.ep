@@ -1,0 +1,32 @@
+# Open or create database
+db = database("company.db")
+
+# 1. Create table
+db.query("CREATE TABLE employees (name, role, salary)")
+
+# 2. Insert entries
+db.query("INSERT INTO employees VALUES ('John Doe', 'Engineer', 75000)")
+db.query("INSERT INTO employees VALUES ('Jane Smith', 'Manager', 95000)")
+db.query("INSERT INTO employees VALUES ('Bob Johnson', 'Engineer', 80000)")
+
+# 3. Select all employees
+all_emp = db.query("SELECT * FROM employees")
+print("Total employees:", len(all_emp))
+
+# 4. Filter Select with WHERE
+engineers = db.query("SELECT name, salary FROM employees WHERE role == 'Engineer'")
+print("Found", len(engineers), "engineers:")
+for (i = 0; i < len(engineers); i = i + 1) {
+    emp = engineers[i]
+    print("- Name:", emp.name, "Salary:", emp.salary)
+}
+
+# 5. Update salaries
+db.query("UPDATE employees SET salary = 85000 WHERE name == 'Bob Johnson'")
+updated_bob = db.query("SELECT salary FROM employees WHERE name == 'Bob Johnson'")
+print("Bob updated salary (expected 85000):", updated_bob[0].salary)
+
+# 6. Delete entry
+db.query("DELETE FROM employees WHERE name == 'John Doe'")
+all_emp_after = db.query("SELECT name FROM employees")
+print("Employees remaining (expected 2):", len(all_emp_after))

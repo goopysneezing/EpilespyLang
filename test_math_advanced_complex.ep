@@ -1,0 +1,41 @@
+# EpilepsyLang Complex Numbers and Advanced Constants Verification
+
+print("=== 1. Mathematical Constants ===")
+print("pi (expected 3.14159...):", pi)
+print("e (expected 2.71828...):", e)
+print("i (expected i):", i)
+print("infinity (expected infinity):", infinity)
+print("inf (expected infinity):", inf)
+print("nan (expected nan):", nan)
+print("phi / gold (expected 1.61803...):", phi)
+print("gamma (expected 0.57721...):", gamma)
+print("catalan (expected 0.91596...):", catalan)
+print("apery (expected 1.20205...):", apery)
+
+
+print("\n=== 2. Square Root of Negative Numbers ===")
+print("sqrt(-1) (expected i):", sqrt(-1))
+print("sqrt(-16) (expected 4i):", sqrt(-16))
+
+
+print("\n=== 3. Complex Arithmetic ===")
+z1 = 2 + 3*i
+z2 = 1 - 2*i
+print("z1:", z1)
+print("z2:", z2)
+print("z1 + z2 (expected 3 + i):", z1 + z2)
+print("z1 - z2 (expected 1 + 5i):", z1 - z2)
+print("z1 * z2 (expected 8 - i):", z1 * z2)
+print("z1 / z2 (expected -0.8 + 1.4i):", z1 / z2)
+print("-z1 (expected -2 - 3i):", -z1)
+
+
+print("\n=== 4. Complex Built-in Functions ===")
+z = 3 + 4*i
+print("z:", z)
+print("real(z) (expected 3):", real(z))
+print("imag(z) (expected 4):", imag(z))
+print("conj(z) (expected 3 - 4i):", conj(z))
+print("abs(z) (expected 5):", abs(z))
+print("arg(i) (expected 1.57079...):", arg(i))
+print("arg(-1) (expected 3.14159...):", arg(-1))

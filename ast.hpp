@@ -104,6 +104,7 @@ class ArrayExpr;
 class IndexExpr;
 class IndexAssignmentExpr;
 class MethodCallExpr;
+class PropertyAccessExpr;
 
 class ExprVisitor {
 public:
@@ -118,6 +119,7 @@ public:
     virtual Value visitIndexExpr(IndexExpr* expr) = 0;
     virtual Value visitIndexAssignmentExpr(IndexAssignmentExpr* expr) = 0;
     virtual Value visitMethodCallExpr(MethodCallExpr* expr) = 0;
+    virtual Value visitPropertyAccessExpr(PropertyAccessExpr* expr) = 0;
 };
 
 class Expr {
@@ -211,6 +213,15 @@ public:
     MethodCallExpr(ExprPtr object, Token method, std::vector<ExprPtr> arguments)
         : object(object), method(method), arguments(arguments) {}
     Value accept(ExprVisitor* visitor) override { return visitor->visitMethodCallExpr(this); }
+};
+
+class PropertyAccessExpr : public Expr {
+public:
+    ExprPtr object;
+    Token property;
+    PropertyAccessExpr(ExprPtr object, Token property)
+        : object(object), property(property) {}
+    Value accept(ExprVisitor* visitor) override { return visitor->visitPropertyAccessExpr(this); }
 };
 
 // Forward declaration of statements
