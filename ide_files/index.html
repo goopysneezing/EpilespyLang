@@ -48,16 +48,13 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Outfit:wght@100..900&display=swap" rel="stylesheet">
     <!-- Lucide Icons CDN -->
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="node_modules/lucide/dist/umd/lucide.min.js"></script>
     <!-- Monaco Editor Loader -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.39.0/min/vs/loader.min.js"></script>
+    <script src="node_modules/monaco-editor/min/vs/loader.js"></script>
     <script>
-        require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.39.0/min/vs' } });
+        require.config({ paths: { vs: 'node_modules/monaco-editor/min/vs' } });
     </script>
-    <!-- Three.js and Gizmo controls for 3D Scene Designer -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TransformControls.js"></script>
+
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -285,17 +282,7 @@ res = (x + 10) * 2</code></pre>
                     <!-- File Tabs dynamically rendered here -->
                 </div>
                 <div class="tabs-controls">
-                    <!-- Editor Mode Toggle Pill for Scene Designer vs Source Code -->
-                    <div id="editor-mode-toggle" class="mode-toggle-container" style="display: none;">
-                        <button id="btn-mode-scene" class="mode-toggle-btn active" title="Switch to Visual 3D Scene Designer">
-                            <i data-lucide="layout"></i>
-                            <span>Scene Designer</span>
-                        </button>
-                        <button id="btn-mode-code" class="mode-toggle-btn" title="Switch to Source Code Editor">
-                            <i data-lucide="code-2"></i>
-                            <span>Source Code</span>
-                        </button>
-                    </div>
+
 
                     <button class="run-control-btn btn-run" id="btn-run" title="Run Current File (F5)">
                         <i data-lucide="play"></i>
@@ -325,67 +312,7 @@ res = (x + 10) * 2</code></pre>
                 <!-- Monaco instance target -->
                 <div id="monaco-editor-instance" style="width: 100%; height: 100%; display: none;"></div>
 
-                <!-- Roblox-Studio-like Scene Designer -->
-                <div id="scene-designer-pane" style="width: 100%; height: 100%; display: none;">
-                    <div class="scene-designer-layout">
-                        <!-- Left Viewport Area -->
-                        <div class="scene-viewport-container">
-                            <!-- Floating Glassmorphic Toolbar -->
-                            <div class="scene-designer-toolbar">
-                                <div class="toolbar-group">
-                                    <span class="toolbar-label">Tools</span>
-                                    <button id="tool-select" class="toolbar-btn active" title="Select Tool (Q)"><i data-lucide="mouse-pointer"></i></button>
-                                    <button id="tool-translate" class="toolbar-btn" title="Move Tool (W)"><i data-lucide="move"></i></button>
-                                    <button id="tool-scale" class="toolbar-btn" title="Scale Tool (E)"><i data-lucide="maximize"></i></button>
-                                    <button id="tool-rotate" class="toolbar-btn" title="Rotate Tool (R)"><i data-lucide="rotate-cw"></i></button>
-                                </div>
-                                <div class="toolbar-separator"></div>
-                                <div class="toolbar-group">
-                                    <span class="toolbar-label">Insert</span>
-                                    <button id="add-cube" class="toolbar-btn" title="Insert Cube Block"><i data-lucide="box"></i> <span>Block</span></button>
-                                    <button id="add-tree" class="toolbar-btn" title="Insert Low-Poly Tree"><i data-lucide="tree-pine"></i> <span>Tree</span></button>
-                                    <button id="add-model" class="toolbar-btn" title="Insert Custom Model (.obj)"><i data-lucide="file-key"></i> <span>Model</span></button>
-                                    <button id="add-grid" class="toolbar-btn" title="Insert Grid Floor"><i data-lucide="grid"></i> <span>Grid</span></button>
-                                </div>
-                                <div class="toolbar-separator"></div>
-                                <div class="toolbar-group">
-                                    <span class="toolbar-label">Actions</span>
-                                    <button id="btn-duplicate" class="toolbar-btn" title="Duplicate Selected (Ctrl+D)"><i data-lucide="copy"></i></button>
-                                    <button id="btn-delete" class="toolbar-btn btn-danger-action" title="Delete Selected (Delete)"><i data-lucide="trash-2"></i></button>
-                                </div>
-                            </div>
-                            
-                            <!-- WebGL 3D Canvas -->
-                            <div id="scene-canvas-container"></div>
-                        </div>
-                        
-                        <!-- Right Roblox Studio Panel -->
-                        <div class="scene-studio-panel">
-                            <!-- Explorer Panel -->
-                            <div class="studio-explorer">
-                                <div class="panel-header">
-                                    <span>Explorer</span>
-                                </div>
-                                <div class="explorer-tree" id="scene-explorer-list">
-                                    <!-- Populated dynamically -->
-                                </div>
-                            </div>
-                            
-                            <!-- Properties Panel -->
-                            <div class="studio-properties">
-                                <div class="panel-header">
-                                    <span>Properties</span>
-                                </div>
-                                <div class="properties-container" id="scene-properties-panel">
-                                    <!-- Selected details show here -->
-                                    <div class="empty-selection-message">
-                                        Select an object to edit properties
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+
             </div>
 
             <!-- Bottom Console Panel -->
