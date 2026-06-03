@@ -5,6 +5,7 @@ let openTabs = []; // { path, name, isDirty, model, originalContent }
 let isExecuting = false;
 let executionEventSource = null;
 let activeSidebarTab = 'explorer';
+let debugPollInterval = null;
 
 
 
@@ -481,6 +482,13 @@ function startExecution() {
     document.getElementById('btn-stop').disabled = false;
     setMode('running', 'Running...');
 
+    // Clear any existing debug status poll first
+    if (debugPollInterval) {
+        clearInterval(debugPollInterval);
+    }
+    updateDebugUI({ status: 'running', vars: null });
+    debugPollInterval = setInterval(pollDebugState, 250);
+
     const runUrl = `/api/run-stream?path=${encodeURIComponent(activeTabPath)}`;
     executionEventSource = new EventSource(runUrl);
 
@@ -528,6 +536,89 @@ function endExecution() {
     document.querySelectorAll('.btn-run').forEach(btn => btn.disabled = false);
     document.getElementById('btn-stop').disabled = true;
     setMode('ready', 'Ready');
+
+    // Stop debug status polling
+    if (debugPollInterval) {
+        clearInterval(debugPollInterval);
+        debugPollInterval = null;
+    }
+    updateDebugUI({ status: 'stopped', vars: null });
+}
+
+// Debugger helper functions
+function escapeHtml(str) {
+    if (typeof str !== 'string') {
+        str = String(str);
+    }
+    return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+async function pollDebugState() {
+    if (!isExecuting) return;
+    try {
+        const response = await fetch('/api/debug-state');
+        if (!response.ok) return;
+        const data = await response.json();
+        updateDebugUI(data);
+    } catch (e) {
+        // Silently ignore errors
+    }
+}
+
+function updateDebugUI(data) {
+    const statusPill = document.getElementById('debug-status');
+    const statusText = document.getElementById('debug-status-text');
+    const resumeBtn = document.getElementById('btn-debug-resume');
+    const varsList = document.getElementById('debug-variables-list');
+
+    if (!statusPill || !statusText || !resumeBtn || !varsList) return;
+
+    statusPill.className = `debug-status-pill ${data.status}`;
+    
+    const capitalizedStatus = data.status.charAt(0).toUpperCase() + data.status.slice(1);
+    statusText.textContent = capitalizedStatus;
+
+    if (data.status === 'paused') {
+        resumeBtn.removeAttribute('disabled');
+    } else {
+        resumeBtn.setAttribute('disabled', 'true');
+    }
+
+    if (data.status === 'paused' && data.vars) {
+        const entries = Object.entries(data.vars);
+        if (entries.length === 0) {
+            varsList.innerHTML = `<tr><td colspan="2" class="empty-state">No variables in scope</td></tr>`;
+        } else {
+            varsList.innerHTML = entries.map(([name, val]) => {
+                return `
+                    <tr>
+                        <td class="var-name">${escapeHtml(name)}</td>
+                        <td class="var-value">${escapeHtml(val)}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+    } else if (data.status === 'running') {
+        varsList.innerHTML = `<tr><td colspan="2" class="empty-state">Running...</td></tr>`;
+    } else {
+        varsList.innerHTML = `<tr><td colspan="2" class="empty-state">Not paused</td></tr>`;
+    }
+}
+
+async function resumeScriptExecution() {
+    try {
+        const response = await fetch('/api/debug-resume', { method: 'POST' });
+        if (response.ok) {
+            updateDebugUI({ status: 'running', vars: null });
+        }
+    } catch (e) {
+        showToast('Failed to send resume signal.', 'error');
+    }
 }
 
 // Stream Compiler Builds
@@ -858,6 +949,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btn-run-sidebar').addEventListener('click', runActiveScript);
     document.getElementById('btn-stop').addEventListener('click', stopExecution);
     document.getElementById('btn-build-sidebar').addEventListener('click', buildWorkspaceInterpreter);
+    document.getElementById('btn-debug-resume').addEventListener('click', resumeScriptExecution);
 
     // 7. Modal cancellation bindings
     document.getElementById('modal-btn-cancel').addEventListener('click', closePromptModal);

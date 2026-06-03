@@ -1274,6 +1274,119 @@ button {
     height: 12px;
 }
 
+/* ==========================================================================
+   Debugger Styles
+   ========================================================================== */
+.debugger-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px;
+    height: 100%;
+}
+
+.debug-status-container {
+    display: flex;
+    align-items: center;
+    margin-top: 8px;
+}
+
+.debug-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border: 1px solid transparent;
+}
+
+.debug-status-pill.stopped {
+    background-color: rgba(100, 116, 139, 0.1);
+    color: var(--text-secondary);
+    border-color: rgba(100, 116, 139, 0.2);
+}
+
+.debug-status-pill.running {
+    background-color: rgba(16, 185, 129, 0.1);
+    color: var(--accent-green);
+    border-color: rgba(16, 185, 129, 0.2);
+}
+
+.debug-status-pill.paused {
+    background-color: rgba(245, 158, 11, 0.15);
+    color: var(--accent-yellow);
+    border-color: rgba(245, 158, 11, 0.3);
+    box-shadow: 0 0 10px rgba(245, 158, 11, 0.1);
+}
+
+/* Variables Table */
+.variables-table-container {
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-top: 8px;
+    max-height: calc(100vh - 320px);
+    overflow-y: auto;
+}
+
+.variables-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    text-align: left;
+}
+
+.variables-table th {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-weight: 600;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-color);
+    font-family: var(--font-ui);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.variables-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    word-break: break-all;
+    vertical-align: top;
+}
+
+.variables-table tr:last-child td {
+    border-bottom: none;
+}
+
+.variables-table tr:hover {
+    background-color: rgba(255, 255, 255, 0.02);
+}
+
+.variables-table td.var-name {
+    color: var(--accent-cyan);
+    font-weight: 500;
+}
+
+.variables-table td.var-value {
+    color: var(--text-primary);
+}
+
+.variables-table td.empty-state {
+    color: var(--text-muted);
+    text-align: center;
+    font-family: var(--font-ui);
+    font-style: italic;
+    padding: 20px;
+}
+
 
 
 

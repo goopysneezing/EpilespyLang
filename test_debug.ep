@@ -1,0 +1,9 @@
+x = 42
+msg = "Before pause"
+print("About to pause...")
+pause()
+x = 100
+msg = "After pause"
+print("Resumed! x is now:", x)
+pause()
+print("Finished!")

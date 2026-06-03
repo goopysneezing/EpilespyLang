@@ -242,6 +242,80 @@ inline bool fileOrDirExists(const std::string& path) {
     return std::filesystem::exists(cleanFilePath(path));
 }
 
+inline std::string escapeJSONString(const std::string& input) {
+    std::string output = "";
+    for (char c : input) {
+        if (c == '"') output += "\\\"";
+        else if (c == '\\') output += "\\\\";
+        else if (c == '\b') output += "\\b";
+        else if (c == '\f') output += "\\f";
+        else if (c == '\n') output += "\\n";
+        else if (c == '\r') output += "\\r";
+        else if (c == '\t') output += "\\t";
+        else if (static_cast<unsigned char>(c) < 32) {
+            // ignore/skip control chars
+        } else {
+            output += c;
+        }
+    }
+    return output;
+}
+
+inline std::string serializeVariablesToJSON(const std::unordered_map<std::string, Value>& vars) {
+    std::string json = "{";
+    bool first = true;
+    for (const auto& pair : vars) {
+        if (!first) json += ",";
+        first = false;
+        json += "\"" + escapeJSONString(pair.first) + "\":";
+        
+        std::string valStr;
+        if (pair.second.isString()) {
+            valStr = "\"" + escapeJSONString(pair.second.asString()) + "\"";
+        } else {
+            valStr = "\"" + escapeJSONString(pair.second.toString()) + "\"";
+        }
+        json += valStr;
+    }
+    json += "}";
+    return json;
+}
+
+inline bool sendDebugPause(const std::string& jsonVars) {
+    HINTERNET hInternet = InternetOpenA("EpilespyLangUserAgent", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
+    if (!hInternet) return false;
+    
+    HINTERNET hConnect = InternetConnectA(hInternet, "127.0.0.1", 8000, NULL, NULL, INTERNET_SERVICE_HTTP, 0, 0);
+    if (!hConnect) {
+        InternetCloseHandle(hInternet);
+        return false;
+    }
+    
+    HINTERNET hRequest = HttpOpenRequestA(
+        hConnect, 
+        "POST", 
+        "/api/debug-pause", 
+        NULL, 
+        NULL, 
+        NULL, 
+        INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE, 
+        0
+    );
+    if (!hRequest) {
+        InternetCloseHandle(hConnect);
+        InternetCloseHandle(hInternet);
+        return false;
+    }
+    
+    std::string headers = "Content-Type: application/json\r\n";
+    BOOL sent = HttpSendRequestA(hRequest, headers.c_str(), headers.length(), (LPVOID)jsonVars.c_str(), jsonVars.length());
+    
+    InternetCloseHandle(hRequest);
+    InternetCloseHandle(hConnect);
+    InternetCloseHandle(hInternet);
+    return sent != 0;
+}
+
 inline std::string fetchURL(const std::string& url) {
     HINTERNET hInternet = InternetOpenA("EpilespyLangUserAgent", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
     if (!hInternet) {
@@ -630,6 +704,51 @@ public:
         std::vector<Value> args;
         for (auto& argExpr : expr->arguments) {
             args.push_back(evaluate(argExpr));
+        }
+
+        if (calleeName == "pause") {
+            if (args.size() != 0) {
+                throw RuntimeError(expr->callee.line, "pause() expects exactly 0 arguments.");
+            }
+            std::unordered_map<std::string, Value> vars;
+            if (environment != nullptr) {
+                environment->getAll(vars);
+            }
+            std::string jsonVars = serializeVariablesToJSON(vars);
+            bool ideNotified = sendDebugPause(jsonVars);
+            if (ideNotified) {
+                while (true) {
+                    std::string status = "";
+                    try {
+                        status = fetchURL("http://127.0.0.1:8000/api/debug-status");
+                    } catch (...) {
+                        break;
+                    }
+                    if (status == "resume") {
+                        break;
+                    }
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                }
+            } else {
+                std::lock_guard<std::mutex> lock(getStdoutMutex());
+                std::cout << "\n=== [DEBUG PAUSED] ===\n";
+                if (vars.empty()) {
+                    std::cout << "  No variables in scope.\n";
+                } else {
+                    for (const auto& pair : vars) {
+                        if (pair.second.isString()) {
+                            std::cout << "  " << pair.first << " = \"" << pair.second.asString() << "\"\n";
+                        } else {
+                            std::cout << "  " << pair.first << " = " << pair.second.toString() << "\n";
+                        }
+                    }
+                }
+                std::cout << "Press Enter to resume...";
+                std::string temp;
+                std::getline(std::cin, temp);
+                std::cout << "=== [RESUMING] ===\n\n";
+            }
+            return Value();
         }
 
         if (calleeName == "print") {

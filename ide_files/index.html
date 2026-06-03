@@ -71,6 +71,9 @@
                 <button class="activity-btn" data-tab="compiler" title="Interpreter & Compiler">
                     <i data-lucide="play-circle"></i>
                 </button>
+                <button class="activity-btn" data-tab="debugger" title="Debugger">
+                    <i data-lucide="bug"></i>
+                </button>
             </div>
             <div class="activity-bottom">
                 <button class="activity-btn" data-tab="settings" title="Settings">
@@ -138,6 +141,46 @@
                         <button class="secondary-btn btn-build" id="btn-build-sidebar">
                             <i data-lucide="cpu"></i> Build C++ Source
                         </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar: Debugger -->
+            <div class="sidebar-tab-content" id="sidebar-debugger">
+                <div class="sidebar-header">
+                    <h3>DEBUGGER</h3>
+                </div>
+                <div class="debugger-panel">
+                    <div class="panel-section">
+                        <h4>Debug Status</h4>
+                        <div class="debug-status-container">
+                            <span class="debug-status-pill stopped" id="debug-status">
+                                <span class="pulse-dot"></span> <span id="debug-status-text">Stopped</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="panel-section debug-controls-section">
+                        <button class="primary-btn" id="btn-debug-resume" disabled style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                            <i data-lucide="play"></i> Resume Execution
+                        </button>
+                    </div>
+                    <div class="panel-section">
+                        <h4>Variables in Scope</h4>
+                        <div class="variables-table-container">
+                            <table class="variables-table">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="debug-variables-list">
+                                    <tr>
+                                        <td colspan="2" class="empty-state">Not paused</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>

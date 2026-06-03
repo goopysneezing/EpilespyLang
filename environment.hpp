@@ -17,6 +17,15 @@ public:
         return enclosing;
     }
 
+    void getAll(std::unordered_map<std::string, Value>& outValues) const {
+        if (enclosing != nullptr) {
+            enclosing->getAll(outValues);
+        }
+        for (const auto& pair : values) {
+            outValues[pair.first] = pair.second;
+        }
+    }
+
     std::shared_ptr<Environment> clone() {
         auto newEnv = std::make_shared<Environment>();
         for (const auto& pair : this->values) {

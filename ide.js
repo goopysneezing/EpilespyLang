@@ -35,6 +35,7 @@ if (parentPid && !isNaN(parentPid)) {
 }
 
 let activeProcess = null;
+let debugState = { status: 'running', vars: null };
 
 // Safe path check to prevent directory traversal
 function isSafePath(targetPath) {
@@ -242,6 +243,8 @@ const server = http.createServer(async (req, res) => {
             if (activeProcess) {
                 try { activeProcess.kill(); } catch (e) {}
             }
+
+            debugState = { status: 'running', vars: null };
 
             activeProcess = spawn(interpreterExe, [filePath], { cwd: WORKSPACE_DIR });
 
@@ -477,6 +480,52 @@ const server = http.createServer(async (req, res) => {
             }
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ success: true }));
+            return;
+        }
+
+        // 11. POST: Debug Pause (set variables and set status = paused)
+        else if (req.method === 'POST' && pathname === '/api/debug-pause') {
+            let body = '';
+            req.on('data', chunk => body += chunk);
+            req.on('end', () => {
+                try {
+                    const data = JSON.parse(body);
+                    debugState.status = 'paused';
+                    debugState.vars = data;
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: true }));
+                } catch (err) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: err.message }));
+                }
+            });
+            return;
+        }
+
+        // 12. GET: Debug Status (returns state status string)
+        else if (req.method === 'GET' && pathname === '/api/debug-status') {
+            const currentStatus = debugState.status;
+            if (currentStatus === 'resume') {
+                debugState.status = 'running';
+            }
+            res.writeHead(200, { 'Content-Type': 'text/plain' });
+            res.end(currentStatus);
+            return;
+        }
+
+        // 13. POST: Debug Resume (set status = resume, clear variables)
+        else if (req.method === 'POST' && pathname === '/api/debug-resume') {
+            debugState.status = 'resume';
+            debugState.vars = null;
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true }));
+            return;
+        }
+
+        // 14. GET: Full Debug State (for client UI polling)
+        else if (req.method === 'GET' && pathname === '/api/debug-state') {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(debugState));
             return;
         }
 
