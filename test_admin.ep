@@ -1,0 +1,9 @@
+print("Are we parent admin?", is_admin())
+
+print("--- Running first command via sudo (should trigger UAC prompt if not already admin) ---")
+res = sudo("net.exe session")
+print("First net session exit code (0 if admin):", res)
+
+print("--- Running second command via sudo (should NOT trigger UAC prompt!) ---")
+res2 = sudo("net.exe session")
+print("Second net session exit code (0 if admin):", res2)

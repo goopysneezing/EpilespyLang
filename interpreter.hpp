@@ -11,6 +11,8 @@
 #include <chrono>
 #include <mutex>
 #include <atomic>
+#include <shellapi.h>
+#include <shlobj.h>
 #include "ast.hpp"
 #include "value.hpp"
 #include "environment.hpp"
@@ -28,6 +30,121 @@ inline std::mutex& getRegistryMutex() {
 inline std::vector<class Interpreter*>& getActiveInterpreters() {
     static std::vector<class Interpreter*> registry;
     return registry;
+}
+
+class AdminHelperManager {
+private:
+    HANDLE hPipe = INVALID_HANDLE_VALUE;
+    HANDLE hProcess = NULL;
+    std::string pipeName;
+
+public:
+    AdminHelperManager() {
+        pipeName = "\\\\.\\pipe\\EpilepsyAdmin_" + std::to_string(GetCurrentProcessId());
+    }
+
+    ~AdminHelperManager() {
+        cleanup();
+    }
+
+    void cleanup() {
+        if (hPipe != INVALID_HANDLE_VALUE) {
+            DWORD cmdLen = 4;
+            DWORD bytesWritten = 0;
+            WriteFile(hPipe, &cmdLen, sizeof(cmdLen), &bytesWritten, NULL);
+            WriteFile(hPipe, "exit", 4, &bytesWritten, NULL);
+            
+            CloseHandle(hPipe);
+            hPipe = INVALID_HANDLE_VALUE;
+        }
+        if (hProcess != NULL) {
+            CloseHandle(hProcess);
+            hProcess = NULL;
+        }
+    }
+
+    bool ensureStarted(int line) {
+        if (hPipe != INVALID_HANDLE_VALUE) {
+            return true;
+        }
+
+        hPipe = CreateNamedPipeA(
+            pipeName.c_str(),
+            PIPE_ACCESS_DUPLEX,
+            PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
+            1,
+            1024,
+            1024,
+            0,
+            NULL
+        );
+
+        if (hPipe == INVALID_HANDLE_VALUE) {
+            throw RuntimeError(line, "Failed to create named pipe for admin helper. (Windows Error " + std::to_string(GetLastError()) + ")");
+        }
+
+        char szPath[MAX_PATH];
+        GetModuleFileNameA(NULL, szPath, MAX_PATH);
+
+        std::string params = "--admin-helper:" + pipeName;
+
+        SHELLEXECUTEINFOA sei;
+        ZeroMemory(&sei, sizeof(sei));
+        sei.cbSize = sizeof(sei);
+        sei.fMask = SEE_MASK_NOCLOSEPROCESS;
+        sei.lpVerb = "runas";
+        sei.lpFile = szPath;
+        sei.lpParameters = params.c_str();
+        sei.nShow = SW_HIDE;
+
+        if (!ShellExecuteExA(&sei)) {
+            CloseHandle(hPipe);
+            hPipe = INVALID_HANDLE_VALUE;
+            throw RuntimeError(line, "Elevation request denied (Windows Error " + std::to_string(GetLastError()) + ")");
+        }
+
+        hProcess = sei.hProcess;
+
+        if (!ConnectNamedPipe(hPipe, NULL)) {
+            if (GetLastError() != ERROR_PIPE_CONNECTED) {
+                cleanup();
+                throw RuntimeError(line, "Failed to connect to admin helper.");
+            }
+        }
+
+        return true;
+    }
+
+    DWORD executeCommand(const std::string& cmd, int line) {
+        ensureStarted(line);
+
+        DWORD cmdLen = static_cast<DWORD>(cmd.length());
+        DWORD bytesWritten = 0;
+        
+        if (!WriteFile(hPipe, &cmdLen, sizeof(cmdLen), &bytesWritten, NULL)) {
+            cleanup();
+            throw RuntimeError(line, "Failed to communicate with admin helper.");
+        }
+
+        if (!WriteFile(hPipe, cmd.c_str(), cmdLen, &bytesWritten, NULL)) {
+            cleanup();
+            throw RuntimeError(line, "Failed to communicate with admin helper.");
+        }
+
+        DWORD exitCode = 0;
+        DWORD bytesRead = 0;
+        if (!ReadFile(hPipe, &exitCode, sizeof(exitCode), &bytesRead, NULL)) {
+            cleanup();
+            throw RuntimeError(line, "Failed to read response from admin helper.");
+        }
+
+        return exitCode;
+    }
+};
+
+inline AdminHelperManager& getAdminHelperManager() {
+    static AdminHelperManager manager;
+    return manager;
 }
 
 struct RegistryGuard {
@@ -843,6 +960,68 @@ public:
             double ms = args[0].asNumber();
             std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<long long>(ms)));
             return Value();
+        }
+
+        if (calleeName == "larp") {
+            if (args.size() != 1) {
+                throw RuntimeError(expr->callee.line, "larp() expects exactly 1 argument (executable path).");
+            }
+            if (!args[0].isString()) {
+                throw RuntimeError(expr->callee.line, "larp() argument must be a string.");
+            }
+            std::string path = args[0].asString();
+
+            std::vector<char> cmdBuf(path.begin(), path.end());
+            cmdBuf.push_back('\0');
+
+            std::cout.flush();
+
+            STARTUPINFOA si;
+            PROCESS_INFORMATION pi;
+            ZeroMemory(&si, sizeof(si));
+            si.cb = sizeof(si);
+            ZeroMemory(&pi, sizeof(pi));
+
+            if (!CreateProcessA(
+                NULL,
+                cmdBuf.data(),
+                NULL,
+                NULL,
+                false,
+                0,
+                NULL,
+                NULL,
+                &si,
+                &pi
+            )) {
+                throw RuntimeError(expr->callee.line, "larp() failed to start application: " + path + " (Windows Error " + std::to_string(GetLastError()) + ")");
+            }
+
+            WaitForSingleObject(pi.hProcess, INFINITE);
+            CloseHandle(pi.hProcess);
+            CloseHandle(pi.hThread);
+
+            return Value();
+        }
+
+        if (calleeName == "sudo") {
+            if (args.size() != 1) {
+                throw RuntimeError(expr->callee.line, "sudo() expects exactly 1 argument (command to run).");
+            }
+            if (!args[0].isString()) {
+                throw RuntimeError(expr->callee.line, "sudo() argument must be a string.");
+            }
+            std::string cmd = args[0].asString();
+
+            DWORD exitCode = getAdminHelperManager().executeCommand(cmd, expr->callee.line);
+            return Value(static_cast<double>(exitCode));
+        }
+
+        if (calleeName == "is_admin") {
+            if (args.size() != 0) {
+                throw RuntimeError(expr->callee.line, "is_admin() expects 0 arguments.");
+            }
+            return Value(static_cast<bool>(IsUserAnAdmin()));
         }
 
         // Mathematical Built-in Functions

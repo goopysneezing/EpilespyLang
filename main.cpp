@@ -160,6 +160,64 @@ std::string getExeDirectory() {
     return p.parent_path().string();
 }
 
+void runAdminHelper(const std::string& pipeName) {
+    HANDLE hPipe = CreateFileA(
+        pipeName.c_str(),
+        GENERIC_READ | GENERIC_WRITE,
+        0,
+        NULL,
+        OPEN_EXISTING,
+        0,
+        NULL
+    );
+
+    if (hPipe == INVALID_HANDLE_VALUE) {
+        return;
+    }
+
+    while (true) {
+        DWORD bytesRead = 0;
+        DWORD cmdLen = 0;
+        if (!ReadFile(hPipe, &cmdLen, sizeof(cmdLen), &bytesRead, NULL) || bytesRead == 0) {
+            break;
+        }
+
+        std::vector<char> buf(cmdLen + 1, 0);
+        if (!ReadFile(hPipe, buf.data(), cmdLen, &bytesRead, NULL) || bytesRead == 0) {
+            break;
+        }
+        std::string cmd(buf.data(), bytesRead);
+
+        if (cmd == "exit") {
+            break;
+        }
+
+        std::vector<char> cmdBuf(cmd.begin(), cmd.end());
+        cmdBuf.push_back('\0');
+
+        STARTUPINFOA si;
+        PROCESS_INFORMATION pi;
+        ZeroMemory(&si, sizeof(si));
+        si.cb = sizeof(si);
+        ZeroMemory(&pi, sizeof(pi));
+
+        DWORD exitCode = 0xFFFFFFFF;
+        if (CreateProcessA(NULL, cmdBuf.data(), NULL, NULL, false, 0, NULL, NULL, &si, &pi)) {
+            WaitForSingleObject(pi.hProcess, INFINITE);
+            GetExitCodeProcess(pi.hProcess, &exitCode);
+            CloseHandle(pi.hProcess);
+            CloseHandle(pi.hThread);
+        } else {
+            exitCode = GetLastError();
+        }
+
+        DWORD bytesWritten = 0;
+        WriteFile(hPipe, &exitCode, sizeof(exitCode), &bytesWritten, NULL);
+    }
+
+    CloseHandle(hPipe);
+}
+
 int main(int argc, char* argv[]) {
     if (argc > 2) {
         std::cout << "Usage: EpilespyLang [script.ep] or --repl\n";
@@ -168,6 +226,10 @@ int main(int argc, char* argv[]) {
         std::string arg = argv[1];
         if (arg == "--repl") {
             runREPL();
+        } else if (arg.rfind("--admin-helper:", 0) == 0) {
+            std::string pipeName = arg.substr(15);
+            runAdminHelper(pipeName);
+            return 0;
         } else {
             runFile(argv[1]);
         }
