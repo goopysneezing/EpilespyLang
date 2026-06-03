@@ -720,41 +720,6 @@ public:
         objects3D.push_back(obj);
     }
 
-    void loadScene(const std::string& scenePath) {
-        std::ifstream file(scenePath);
-        if (!file.is_open()) return;
-        std::string line;
-        while (std::getline(file, line)) {
-            if (line.empty() || line[0] == '#') continue;
-            std::stringstream ss(line);
-            std::string type;
-            ss >> type;
-            if (type == "grid") {
-                double x, z, size, spacing;
-                std::string color;
-                if (ss >> x >> z >> size >> spacing >> color) {
-                    addGrid(x, z, size, spacing, color);
-                }
-            } else if (type == "cube" || type == "box") {
-                double x, y, z, sx, sy, sz;
-                std::string color;
-                if (ss >> x >> y >> z >> sx >> sy >> sz >> color) {
-                    addBox(x, y, z, sx, sy, sz, color);
-                }
-            } else if (type == "tree") {
-                double x, y, z, th, fs;
-                if (ss >> x >> y >> z >> th >> fs) {
-                    addTree(x, y, z, th, fs);
-                }
-            } else if (type == "model") {
-                double x, y, z, sx, sy, sz, rx, ry, rz;
-                std::string modelPath, color;
-                if (ss >> x >> y >> z >> sx >> sy >> sz >> rx >> ry >> rz >> modelPath >> color) {
-                    addModel(x, y, z, sx, sy, sz, rx, ry, rz, modelPath, color);
-                }
-            }
-        }
-    }
 
     void addGrid(double x, double z, double size, double spacing, const std::string& colorName) {
         std::lock_guard<std::recursive_mutex> lock(mtx);

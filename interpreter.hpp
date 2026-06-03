@@ -2063,13 +2063,6 @@ public:
                 return obj;
             }
 
-            if (methodName == "loadScene") {
-                if (args.size() != 1) throw RuntimeError(expr->method.line, "loadScene() expects exactly 1 argument (sceneFilePath).");
-                if (!args[0].isString()) throw RuntimeError(expr->method.line, "loadScene() expects a string argument.");
-                win->loadScene(args[0].asString());
-                return obj;
-            }
-
             if (methodName == "addGrid") {
                 if (args.size() != 5) throw RuntimeError(expr->method.line, "addGrid() expects exactly 5 arguments (x, z, size, spacing, color).");
                 if (!args[0].isNumber() || !args[1].isNumber() || !args[2].isNumber() || !args[3].isNumber() || !args[4].isString()) {
