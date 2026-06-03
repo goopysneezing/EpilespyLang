@@ -307,6 +307,16 @@ private:
         if (match(TokenType::WHILE)) return whileStatement();
         if (match(TokenType::FOR)) return forStatement();
         if (match(TokenType::SWITCH)) return switchStatement();
+        if (match(TokenType::QBREAK)) {
+            Token token = previous();
+            consumeStatementTerminator();
+            return std::make_shared<QbreakStmt>(token);
+        }
+        if (match(TokenType::QKILLOTHERS)) {
+            Token token = previous();
+            consumeStatementTerminator();
+            return std::make_shared<QkillothersStmt>(token);
+        }
 
         // Check for print statement without parentheses (e.g. print 1;)
         if (check(TokenType::IDENTIFIER) && peek().lexeme == "print") {
@@ -326,13 +336,28 @@ private:
         return expressionStatement();
     }
 
-    StmtPtr block() {
+    std::vector<StmtPtr> parseStatementsList(TokenType endType) {
         std::vector<StmtPtr> statements;
-        while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
-            skipNewlines();
-            if (check(TokenType::RIGHT_BRACE)) break;
+        skipNewlines();
+        while (!check(endType) && !isAtEnd()) {
+            if (match(TokenType::QUANTUM)) {
+                Token name = consume(TokenType::IDENTIFIER, "Expect variable name after 'quantum'.");
+                consume(TokenType::EQUAL, "Expect '=' after variable name.");
+                ExprPtr choices = expression();
+                consumeStatementTerminator();
+                
+                std::vector<StmtPtr> body = parseStatementsList(endType);
+                statements.push_back(std::make_shared<QuantumStmt>(name, choices, body));
+                break;
+            }
             statements.push_back(statement());
+            skipNewlines();
         }
+        return statements;
+    }
+
+    StmtPtr block() {
+        std::vector<StmtPtr> statements = parseStatementsList(TokenType::RIGHT_BRACE);
         consume(TokenType::RIGHT_BRACE, "Expect '}' after block.");
         return std::make_shared<BlockStmt>(statements);
     }
@@ -468,12 +493,6 @@ public:
     Parser(const std::vector<Token>& tokens) : tokens(tokens) {}
 
     std::vector<StmtPtr> parse() {
-        std::vector<StmtPtr> statements;
-        skipNewlines();
-        while (!isAtEnd()) {
-            statements.push_back(statement());
-            skipNewlines();
-        }
-        return statements;
+        return parseStatementsList(TokenType::EOF_VAL);
     }
 };

@@ -1,1 +1,3 @@
-print(fetch("https://raw.githubusercontent.com/goopysneezing/goopysneezing/refs/heads/main/README.md"))
+if (this the best program ever) {
+    pass
+}

@@ -1,0 +1,58 @@
+# Test Quantum Features in EpilepsyLang
+
+print("--- Test 1: Basic Quantum Superposition ---")
+{
+    quantum x = [1, 2, 3]
+    print("Possibility x =", x)
+}
+
+print("--- Test 2: Crash Suppression (Division by zero) ---")
+{
+    quantum div = [0, 2, 0, 4]
+    # division by zero should crash and terminate silently, printing only the valid outcomes
+    val = 20 / div
+    print("20 /", div, "=", val)
+}
+
+print("--- Test 3: Quantum Break (qbreak) ---")
+{
+    quantum x = [10, 20, 30, 40]
+    # paths where x == 30 should be stopped by qbreak
+    if (x == 30) {
+        qbreak
+    }
+    print("Allowed value:", x)
+}
+
+print("--- Test 4: Nested Scopes ---")
+{
+    quantum x = [1, 2]
+    {
+        quantum y = [10, 20]
+        # x=1 y=10, x=1 y=20, x=2 y=10, x=2 y=20
+        # If product is 20, let's crash or break
+        prod = x * y
+        if (prod == 20) {
+            qbreak
+        }
+        print("x:", x, "y:", y, "product:", prod)
+    }
+}
+
+print("--- Test 5: Quantum Kill Others (qkillothers) ---")
+{
+    quantum x = [1, 2, 3]
+    if (x == 1) {
+        sleep(200)
+        print("x = 1 woke up")
+    }
+    if (x == 2) {
+        sleep(50)
+        qkillothers
+        print("x = 2 woke up, killed others")
+    }
+    if (x == 3) {
+        sleep(200)
+        print("x = 3 woke up")
+    }
+}

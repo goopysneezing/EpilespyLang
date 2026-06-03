@@ -1,0 +1,7 @@
+# Test hash function
+print("MD5 hash of 'hello':", hash("hello", "md5"))
+print("SHA1 hash of 'hello':", hash("hello", "sha1"))
+print("SHA256 hash of 'hello':", hash("hello", "sha256"))
+print("SHA384 hash of 'hello':", hash("hello", "sha384"))
+print("SHA512 hash of 'hello':", hash("hello", "sha512"))
+print("Default hash (SHA256) of 'hello':", hash("hello"))

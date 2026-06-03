@@ -34,6 +34,7 @@ enum class TokenType {
     AND, OR, NOT,
     IF, ELSE, WHILE, FOR, SWITCH, CASE, DEFAULT,
     TRUE, FALSE, NULL_VAL,
+    QUANTUM, QBREAK, QKILLOTHERS,
     
     // Special
     NEWLINE, EOF_VAL
@@ -80,6 +81,9 @@ inline std::string tokenTypeToString(TokenType type) {
         case TokenType::TRUE: return "true";
         case TokenType::FALSE: return "false";
         case TokenType::NULL_VAL: return "null";
+        case TokenType::QUANTUM: return "quantum";
+        case TokenType::QBREAK: return "qbreak";
+        case TokenType::QKILLOTHERS: return "qkillothers";
         case TokenType::NEWLINE: return "NEWLINE";
         case TokenType::EOF_VAL: return "EOF";
         default: return "UNKNOWN";
@@ -231,6 +235,9 @@ class IfStmt;
 class WhileStmt;
 class ForStmt;
 class SwitchStmt;
+class QuantumStmt;
+class QbreakStmt;
+class QkillothersStmt;
 
 class StmtVisitor {
 public:
@@ -241,6 +248,9 @@ public:
     virtual void visitWhileStmt(WhileStmt* stmt) = 0;
     virtual void visitForStmt(ForStmt* stmt) = 0;
     virtual void visitSwitchStmt(SwitchStmt* stmt) = 0;
+    virtual void visitQuantumStmt(QuantumStmt* stmt) = 0;
+    virtual void visitQbreakStmt(QbreakStmt* stmt) = 0;
+    virtual void visitQkillothersStmt(QkillothersStmt* stmt) = 0;
 };
 
 class Stmt {
@@ -308,4 +318,28 @@ public:
     SwitchStmt(Token switchToken, ExprPtr expression, std::vector<SwitchCase> cases, StmtPtr defaultBranch)
         : switchToken(switchToken), expression(expression), cases(cases), defaultBranch(defaultBranch) {}
     void accept(StmtVisitor* visitor) override { visitor->visitSwitchStmt(this); }
+};
+
+class QuantumStmt : public Stmt {
+public:
+    Token name;
+    ExprPtr choices;
+    std::vector<StmtPtr> body;
+    QuantumStmt(Token name, ExprPtr choices, std::vector<StmtPtr> body)
+        : name(name), choices(choices), body(body) {}
+    void accept(StmtVisitor* visitor) override { visitor->visitQuantumStmt(this); }
+};
+
+class QbreakStmt : public Stmt {
+public:
+    Token token;
+    QbreakStmt(Token token) : token(token) {}
+    void accept(StmtVisitor* visitor) override { visitor->visitQbreakStmt(this); }
+};
+
+class QkillothersStmt : public Stmt {
+public:
+    Token token;
+    QkillothersStmt(Token token) : token(token) {}
+    void accept(StmtVisitor* visitor) override { visitor->visitQkillothersStmt(this); }
 };

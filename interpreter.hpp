@@ -9,15 +9,48 @@
 #include <cctype>
 #include <thread>
 #include <chrono>
+#include <mutex>
+#include <atomic>
 #include "ast.hpp"
 #include "value.hpp"
 #include "environment.hpp"
 #include "database.hpp"
+
+inline std::mutex& getStdoutMutex() {
+    static std::mutex mtx;
+    return mtx;
+}
+
+inline std::mutex& getRegistryMutex() {
+    static std::mutex mtx;
+    return mtx;
+}
+inline std::vector<class Interpreter*>& getActiveInterpreters() {
+    static std::vector<class Interpreter*> registry;
+    return registry;
+}
+
+struct RegistryGuard {
+    class Interpreter* interp;
+    RegistryGuard(class Interpreter* i) : interp(i) {
+        std::lock_guard<std::mutex> lock(getRegistryMutex());
+        getActiveInterpreters().push_back(interp);
+    }
+    ~RegistryGuard() {
+        std::lock_guard<std::mutex> lock(getRegistryMutex());
+        auto& list = getActiveInterpreters();
+        list.erase(std::remove(list.begin(), list.end(), interp), list.end());
+    }
+};
 #include <wininet.h>
 #include <fstream>
 #include <sstream>
 #include <filesystem>
 #include <limits>
+#include <wincrypt.h>
+#include <iomanip>
+
+#pragma comment(lib, "advapi32.lib")
 
 inline Complex toComplex(const Value& val) {
     if (val.isComplex()) return val.asComplex();
@@ -134,11 +167,52 @@ inline std::string fetchLocalFile(const std::string& path) {
     return ss.str();
 }
 
+inline std::string computeHash(const std::string& data, ALG_ID algId) {
+    HCRYPTPROV hProv = 0;
+    HCRYPTHASH hHash = 0;
+    std::string result = "";
+
+    if (!CryptAcquireContext(&hProv, NULL, NULL, PROV_RSA_AES, CRYPT_VERIFYCONTEXT)) {
+        return "";
+    }
+
+    if (!CryptCreateHash(hProv, algId, 0, 0, &hHash)) {
+        CryptReleaseContext(hProv, 0);
+        return "";
+    }
+
+    if (!CryptHashData(hHash, reinterpret_cast<const BYTE*>(data.c_str()), static_cast<DWORD>(data.length()), 0)) {
+        CryptDestroyHash(hHash);
+        CryptReleaseContext(hProv, 0);
+        return "";
+    }
+
+    DWORD cbHashSize = 0;
+    DWORD dwCount = sizeof(DWORD);
+    if (CryptGetHashParam(hHash, HP_HASHSIZE, reinterpret_cast<BYTE*>(&cbHashSize), &dwCount, 0)) {
+        std::vector<BYTE> rgbHash(cbHashSize);
+        if (CryptGetHashParam(hHash, HP_HASHVAL, rgbHash.data(), &cbHashSize, 0)) {
+            std::ostringstream oss;
+            for (DWORD i = 0; i < cbHashSize; i++) {
+                oss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(rgbHash[i]);
+            }
+            result = oss.str();
+        }
+    }
+
+    CryptDestroyHash(hHash);
+    CryptReleaseContext(hProv, 0);
+    return result;
+}
+
 class Interpreter : public ExprVisitor, public StmtVisitor {
 private:
     std::shared_ptr<Environment> environment = std::make_shared<Environment>();
     bool epilepsyState = false;
     std::mt19937 rng{static_cast<unsigned int>(std::chrono::system_clock::now().time_since_epoch().count())};
+public:
+    std::atomic<bool> killed{false};
+private:
 
     void checkNumberOperands(Token op, const Value& left, const Value& right) {
         if (left.isNumber() && right.isNumber()) return;
@@ -168,11 +242,30 @@ public:
         return environment;
     }
 
+    std::shared_ptr<Environment> getEnvironment() const {
+        return environment;
+    }
+
+    void setEnvironment(std::shared_ptr<Environment> env) {
+        environment = env;
+    }
+
+    bool getEpilepsyState() const {
+        return epilepsyState;
+    }
+
+    void setEpilepsyState(bool state) {
+        epilepsyState = state;
+    }
+
     Value evaluate(ExprPtr expr) {
         return expr->accept(this);
     }
 
     void execute(StmtPtr stmt) {
+        if (killed) {
+            throw QuantumKilledException();
+        }
         stmt->accept(this);
     }
 
@@ -350,6 +443,7 @@ public:
         }
 
         if (calleeName == "print") {
+            std::lock_guard<std::mutex> lock(getStdoutMutex());
             for (size_t i = 0; i < args.size(); ++i) {
                 if (i > 0) std::cout << " ";
                 std::cout << args[i].toString();
@@ -1504,6 +1598,46 @@ public:
             return Value();
         }
 
+        if (calleeName == "hash") {
+            if (args.size() < 1 || args.size() > 2) {
+                throw RuntimeError(expr->callee.line, "hash() expects 1 or 2 arguments: (data, [algorithm]).");
+            }
+            if (!args[0].isString()) {
+                throw RuntimeError(expr->callee.line, "hash() first argument must be a string.");
+            }
+            std::string algorithm = "sha256";
+            if (args.size() == 2) {
+                if (!args[1].isString()) {
+                    throw RuntimeError(expr->callee.line, "hash() second argument (algorithm) must be a string.");
+                }
+                algorithm = args[1].asString();
+                std::transform(algorithm.begin(), algorithm.end(), algorithm.begin(), [](unsigned char c) {
+                    return std::tolower(c);
+                });
+            }
+
+            ALG_ID algId = CALG_SHA_256;
+            if (algorithm == "md5") {
+                algId = CALG_MD5;
+            } else if (algorithm == "sha1" || algorithm == "sha-1") {
+                algId = CALG_SHA1;
+            } else if (algorithm == "sha256" || algorithm == "sha-256") {
+                algId = CALG_SHA_256;
+            } else if (algorithm == "sha384" || algorithm == "sha-384") {
+                algId = CALG_SHA_384;
+            } else if (algorithm == "sha512" || algorithm == "sha-512") {
+                algId = CALG_SHA_512;
+            } else {
+                throw RuntimeError(expr->callee.line, "Unsupported hashing algorithm: '" + algorithm + "'. Supported: md5, sha1, sha256, sha384, sha512.");
+            }
+
+            std::string hashResult = computeHash(args[0].asString(), algId);
+            if (hashResult.empty()) {
+                throw RuntimeError(expr->callee.line, "Failed to compute hash.");
+            }
+            return Value(hashResult);
+        }
+
         throw RuntimeError(expr->callee.line, "Undefined function '" + calleeName + "'.");
     }
 
@@ -2131,6 +2265,63 @@ public:
 
         if (!matched && stmt->defaultBranch != nullptr) {
             execute(stmt->defaultBranch);
+        }
+    }
+
+    void visitQuantumStmt(QuantumStmt* stmt) override {
+        Value choicesVal = evaluate(stmt->choices);
+        if (!choicesVal.isArray()) {
+            throw RuntimeError(stmt->name.line, "Quantum choices must be an array.");
+        }
+        auto choicesArr = choicesVal.asArray();
+        
+        std::vector<std::thread> threads;
+        for (const auto& choice : *choicesArr) {
+            auto clonedEnv = this->environment->clone();
+            clonedEnv->define(stmt->name.lexeme, choice);
+            
+            threads.push_back(std::thread([this, clonedEnv, stmt]() {
+                try {
+                    Interpreter subInterpreter;
+                    subInterpreter.setEnvironment(clonedEnv);
+                    subInterpreter.setEpilepsyState(this->getEpilepsyState());
+                    
+                    RegistryGuard guard(&subInterpreter);
+                    
+                    for (auto& s : stmt->body) {
+                        subInterpreter.execute(s);
+                    }
+                } catch (const QuantumKilledException&) {
+                    // Silently terminate when killed by other thread
+                } catch (const QuantumBreakException&) {
+                    // Silently terminate on qbreak
+                } catch (const RuntimeError&) {
+                    // Silently terminate on crashes
+                } catch (const std::exception&) {
+                    // Silently terminate on other std exceptions
+                } catch (...) {
+                    // Silently terminate on everything else
+                }
+            }));
+        }
+        
+        for (auto& t : threads) {
+            if (t.joinable()) {
+                t.join();
+            }
+        }
+    }
+
+    void visitQbreakStmt(QbreakStmt* stmt) override {
+        throw QuantumBreakException();
+    }
+
+    void visitQkillothersStmt(QkillothersStmt* stmt) override {
+        std::lock_guard<std::mutex> lock(getRegistryMutex());
+        for (auto* interp : getActiveInterpreters()) {
+            if (interp != this) {
+                interp->killed = true;
+            }
         }
     }
 };

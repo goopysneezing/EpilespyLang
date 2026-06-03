@@ -17,6 +17,17 @@ public:
         return enclosing;
     }
 
+    std::shared_ptr<Environment> clone() {
+        auto newEnv = std::make_shared<Environment>();
+        for (const auto& pair : this->values) {
+            newEnv->values[pair.first] = pair.second.clone();
+        }
+        if (this->enclosing != nullptr) {
+            newEnv->enclosing = this->enclosing->clone();
+        }
+        return newEnv;
+    }
+
     void define(const std::string& name, Value value) {
         values[name] = value;
     }

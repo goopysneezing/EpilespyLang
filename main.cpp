@@ -109,6 +109,8 @@ void runREPL() {
                 interpreter.interpret(statements);
             } catch (const ParseError& e) {
                 std::cerr << "Syntax Error: " << e.what() << "\n";
+            } catch (const QuantumBreakException& e) {
+                std::cerr << "Runtime Error: qbreak statement executed outside of a quantum branch.\n";
             } catch (const RuntimeError& e) {
                 std::cerr << "Runtime Error (Line " << e.line << "): " << e.what() << "\n";
             } catch (const std::exception& e) {
@@ -138,6 +140,9 @@ void runFile(const std::string& path) {
         interpreter.interpret(statements);
     } catch (const ParseError& e) {
         std::cerr << "Syntax Error: " << e.what() << "\n";
+        std::exit(1);
+    } catch (const QuantumBreakException& e) {
+        std::cerr << "Runtime Error: qbreak statement executed outside of a quantum branch.\n";
         std::exit(1);
     } catch (const RuntimeError& e) {
         std::cerr << "Runtime Error (Line " << e.line << "): " << e.what() << "\n";

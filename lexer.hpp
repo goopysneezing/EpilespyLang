@@ -51,6 +51,9 @@ inline std::string getCorrectedKeyword(const std::string& original_id) {
     if (id == "and") return "and";
     if (id == "or") return "or";
     if (id == "not") return "not";
+    if (id == "quantum") return "quantum";
+    if (id == "qbreak") return "qbreak";
+    if (id == "qkillothers") return "qkillothers";
 
     // 2. Strict matching rules for short keywords to prevent false positives
     if (id == "iff" || id == "iif" || id == "fi") return "if";
@@ -67,7 +70,10 @@ inline std::string getCorrectedKeyword(const std::string& original_id) {
         {"default", "default"},
         {"true", "true"},
         {"false", "false"},
-        {"null", "null"}
+        {"null", "null"},
+        {"quantum", "quantum"},
+        {"qbreak", "qbreak"},
+        {"qkillothers", "qkillothers"}
     };
 
     // Specific typo rules for true/false to be even more robust
@@ -342,5 +348,8 @@ inline const std::unordered_map<std::string, TokenType> Lexer::keywords = {
     {"null", TokenType::NULL_VAL},
     {"and", TokenType::AND},
     {"or", TokenType::OR},
-    {"not", TokenType::NOT}
+    {"not", TokenType::NOT},
+    {"quantum", TokenType::QUANTUM},
+    {"qbreak", TokenType::QBREAK},
+    {"qkillothers", TokenType::QKILLOTHERS}
 };

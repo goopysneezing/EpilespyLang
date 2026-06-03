@@ -41,6 +41,20 @@ public:
         : std::runtime_error(message), line(line) {}
 };
 
+class QuantumBreakException : public std::exception {
+public:
+    const char* what() const noexcept override {
+        return "Quantum Break";
+    }
+};
+
+class QuantumKilledException : public std::exception {
+public:
+    const char* what() const noexcept override {
+        return "Quantum Killed";
+    }
+};
+
 struct Nil {
     bool operator==(const Nil&) const { return true; }
     bool operator!=(const Nil&) const { return false; }
@@ -191,6 +205,19 @@ public:
         if (isEntry()) return "entry";
         if (isComplex()) return "complex";
         return "unknown";
+    }
+
+    Value clone() const {
+        if (isArray()) {
+            auto oldArr = asArray();
+            auto newArr = std::make_shared<std::vector<Value>>();
+            newArr->reserve(oldArr->size());
+            for (const auto& item : *oldArr) {
+                newArr->push_back(item.clone());
+            }
+            return Value(newArr);
+        }
+        return *this;
     }
 };
 
