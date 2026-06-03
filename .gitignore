@@ -22,3 +22,5 @@ npx.cmd
 .vs/
 build/
 out/
+# Node modules
+node_modules/
