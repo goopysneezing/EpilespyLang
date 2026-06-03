@@ -4,7 +4,46 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EpilespyLang IDE</title>
+    <!-- Diagnostic Client Error Capture Overlay -->
+    <script>
+        window.onerror = function(message, source, lineno, colno, error) {
+            const errDiv = document.createElement('div');
+            errDiv.style.position = 'fixed';
+            errDiv.style.top = '0';
+            errDiv.style.left = '0';
+            errDiv.style.width = '100vw';
+            errDiv.style.background = '#ef4444';
+            errDiv.style.color = '#ffffff';
+            errDiv.style.padding = '12px 24px';
+            errDiv.style.zIndex = '9999999';
+            errDiv.style.fontFamily = 'monospace';
+            errDiv.style.fontSize = '12px';
+            errDiv.style.lineHeight = '1.5';
+            errDiv.style.boxShadow = '0 6px 20px rgba(0,0,0,0.4)';
+            errDiv.innerHTML = '<strong>[JS ERROR]</strong> ' + message + ' <br> <small>at ' + source + ' (line ' + lineno + ', col ' + colno + ')</small>';
+            document.body.appendChild(errDiv);
+            return false;
+        };
+        window.onunhandledrejection = function(event) {
+            const errDiv = document.createElement('div');
+            errDiv.style.position = 'fixed';
+            errDiv.style.bottom = '0';
+            errDiv.style.left = '0';
+            errDiv.style.width = '100vw';
+            errDiv.style.background = '#f59e0b';
+            errDiv.style.color = '#ffffff';
+            errDiv.style.padding = '12px 24px';
+            errDiv.style.zIndex = '9999999';
+            errDiv.style.fontFamily = 'monospace';
+            errDiv.style.fontSize = '12px';
+            errDiv.style.lineHeight = '1.5';
+            errDiv.style.boxShadow = '0 -6px 20px rgba(0,0,0,0.4)';
+            errDiv.innerHTML = '<strong>[UNHANDLED REJECTION]</strong> ' + (event.reason ? (event.reason.stack || event.reason.message || event.reason) : 'Unknown Rejection');
+            document.body.appendChild(errDiv);
+        };
+    </script>
     <!-- Google Fonts -->
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Outfit:wght@100..900&display=swap" rel="stylesheet">
@@ -15,13 +54,11 @@
     <script>
         require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.39.0/min/vs' } });
     </script>
+    <!-- Three.js and Gizmo controls for 3D Scene Designer -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TransformControls.js"></script>
     <link rel="stylesheet" href="style.css">
-    <!-- Three.js Visual Editor Core and Controls (Loaded Locally) -->
-    <script src="three.min.js"></script>
-    <script src="OrbitControls.js"></script>
-    <script src="TransformControls.js"></script>
-    <script src="OBJLoader.js"></script>
-
 </head>
 <body>
     <div class="app-container">
@@ -248,6 +285,18 @@ res = (x + 10) * 2</code></pre>
                     <!-- File Tabs dynamically rendered here -->
                 </div>
                 <div class="tabs-controls">
+                    <!-- Editor Mode Toggle Pill for Scene Designer vs Source Code -->
+                    <div id="editor-mode-toggle" class="mode-toggle-container" style="display: none;">
+                        <button id="btn-mode-scene" class="mode-toggle-btn active" title="Switch to Visual 3D Scene Designer">
+                            <i data-lucide="layout"></i>
+                            <span>Scene Designer</span>
+                        </button>
+                        <button id="btn-mode-code" class="mode-toggle-btn" title="Switch to Source Code Editor">
+                            <i data-lucide="code-2"></i>
+                            <span>Source Code</span>
+                        </button>
+                    </div>
+
                     <button class="run-control-btn btn-run" id="btn-run" title="Run Current File (F5)">
                         <i data-lucide="play"></i>
                         <span>Run</span>
@@ -276,109 +325,62 @@ res = (x + 10) * 2</code></pre>
                 <!-- Monaco instance target -->
                 <div id="monaco-editor-instance" style="width: 100%; height: 100%; display: none;"></div>
 
-                <!-- Scene Editor Container -->
-                <div id="scene-editor-container" class="scene-editor-root" style="display: none;">
-                    <!-- Scene Editor Toolbar -->
-                    <div class="scene-editor-toolbar">
-                        <div class="toolbar-section">
-                            <span class="section-label">Transform Mode</span>
-                            <div class="btn-group">
-                                <button class="toolbar-btn active" id="btn-gizmo-translate" title="Move (W)">
-                                    <i data-lucide="move"></i>
-                                </button>
-                                <button class="toolbar-btn" id="btn-gizmo-rotate" title="Rotate (E)">
-                                    <i data-lucide="rotate-cw"></i>
-                                </button>
-                                <button class="toolbar-btn" id="btn-gizmo-scale" title="Scale / Stretch (R)">
-                                    <i data-lucide="maximize"></i>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="toolbar-divider"></div>
-
-                        <div class="toolbar-section">
-                            <span class="section-label">Add Primitives</span>
-                            <div class="btn-group">
-                                <button class="toolbar-btn primary-action-btn" id="btn-add-box" title="Add 3D Box">
-                                    <i data-lucide="box"></i> Add Box
-                                </button>
-                                <button class="toolbar-btn primary-action-btn" id="btn-add-tree" title="Add Low-Poly Tree">
-                                    <i data-lucide="sprout"></i> Add Tree
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="toolbar-divider"></div>
-
-                        <div class="toolbar-section">
-                            <span class="section-label">Snap Settings</span>
-                            <div class="snap-controls">
-                                <label for="chk-grid-snap">Snap:</label>
-                                <input type="checkbox" id="chk-grid-snap" checked>
-                                <input type="number" id="num-snap-val" value="0.5" step="0.1" min="0.01" style="width: 60px;">
-                            </div>
-                        </div>
-
-                        <div class="toolbar-divider"></div>
-
-                        <div class="toolbar-section" style="margin-left: auto;">
-                            <button class="toolbar-btn danger-action-btn" id="btn-clear-scene" title="Clear Scene">
-                                <i data-lucide="trash-2"></i> Clear
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Scene Editor Workspace -->
-                    <div class="scene-workspace">
-                        <!-- 3D Canvas Viewport -->
-                        <div id="scene-viewport">
-                            <!-- Floating Keyboard Shortcuts HUD -->
-                            <div class="scene-hud-shortcuts">
-                                <div><kbd>Left Click + Drag</kbd> Orbit</div>
-                                <div><kbd>Right Click + Drag</kbd> Pan</div>
-                                <div><kbd>Scroll</kbd> Zoom</div>
-                                <div><kbd>W</kbd> Move | <kbd>E</kbd> Rotate | <kbd>R</kbd> Scale</div>
-                                <div><kbd>Ctrl + D</kbd> Duplicate | <kbd>Del</kbd> Delete</div>
-                                <div><kbd>Esc</kbd> Deselect</div>
-                            </div>
-
-                            <!-- Built-in Asset Shelf -->
-                            <div class="scene-assets-drawer">
-                                <div class="drawer-header">
-                                    <h4>ASSETS</h4>
+                <!-- Roblox-Studio-like Scene Designer -->
+                <div id="scene-designer-pane" style="width: 100%; height: 100%; display: none;">
+                    <div class="scene-designer-layout">
+                        <!-- Left Viewport Area -->
+                        <div class="scene-viewport-container">
+                            <!-- Floating Glassmorphic Toolbar -->
+                            <div class="scene-designer-toolbar">
+                                <div class="toolbar-group">
+                                    <span class="toolbar-label">Tools</span>
+                                    <button id="tool-select" class="toolbar-btn active" title="Select Tool (Q)"><i data-lucide="mouse-pointer"></i></button>
+                                    <button id="tool-translate" class="toolbar-btn" title="Move Tool (W)"><i data-lucide="move"></i></button>
+                                    <button id="tool-scale" class="toolbar-btn" title="Scale Tool (E)"><i data-lucide="maximize"></i></button>
+                                    <button id="tool-rotate" class="toolbar-btn" title="Rotate Tool (R)"><i data-lucide="rotate-cw"></i></button>
                                 </div>
-                                <div class="drawer-items">
-                                    <button class="asset-card" data-asset="assets/crate.obj">
-                                        <div class="asset-icon"><i data-lucide="package"></i></div>
-                                        <span>Crate</span>
-                                    </button>
-                                    <button class="asset-card" data-asset="assets/tree.obj">
-                                        <div class="asset-icon"><i data-lucide="tree-pine"></i></div>
-                                        <span>Tree</span>
-                                    </button>
-                                    <button class="asset-card" data-asset="assets/rock.obj">
-                                        <div class="asset-icon"><i data-lucide="gem"></i></div>
-                                        <span>Rock</span>
-                                    </button>
-                                    <div class="drawer-item-divider"></div>
-                                    <button class="asset-card import-card" id="btn-import-custom">
-                                        <div class="asset-icon"><i data-lucide="upload-cloud"></i></div>
-                                        <span>Import OBJ</span>
-                                    </button>
+                                <div class="toolbar-separator"></div>
+                                <div class="toolbar-group">
+                                    <span class="toolbar-label">Insert</span>
+                                    <button id="add-cube" class="toolbar-btn" title="Insert Cube Block"><i data-lucide="box"></i> <span>Block</span></button>
+                                    <button id="add-tree" class="toolbar-btn" title="Insert Low-Poly Tree"><i data-lucide="tree-pine"></i> <span>Tree</span></button>
+                                    <button id="add-model" class="toolbar-btn" title="Insert Custom Model (.obj)"><i data-lucide="file-key"></i> <span>Model</span></button>
+                                    <button id="add-grid" class="toolbar-btn" title="Insert Grid Floor"><i data-lucide="grid"></i> <span>Grid</span></button>
+                                </div>
+                                <div class="toolbar-separator"></div>
+                                <div class="toolbar-group">
+                                    <span class="toolbar-label">Actions</span>
+                                    <button id="btn-duplicate" class="toolbar-btn" title="Duplicate Selected (Ctrl+D)"><i data-lucide="copy"></i></button>
+                                    <button id="btn-delete" class="toolbar-btn btn-danger-action" title="Delete Selected (Delete)"><i data-lucide="trash-2"></i></button>
                                 </div>
                             </div>
+                            
+                            <!-- WebGL 3D Canvas -->
+                            <div id="scene-canvas-container"></div>
                         </div>
-
-                        <!-- Side Properties Panel -->
-                        <div class="scene-properties-panel">
-                            <div class="panel-header">
-                                <h3>PROPERTIES</h3>
+                        
+                        <!-- Right Roblox Studio Panel -->
+                        <div class="scene-studio-panel">
+                            <!-- Explorer Panel -->
+                            <div class="studio-explorer">
+                                <div class="panel-header">
+                                    <span>Explorer</span>
+                                </div>
+                                <div class="explorer-tree" id="scene-explorer-list">
+                                    <!-- Populated dynamically -->
+                                </div>
                             </div>
-                            <div class="panel-body" id="properties-content">
-                                <div class="empty-selection-msg">
-                                    <i data-lucide="mouse-pointer"></i>
-                                    <p>Select an object in the scene to inspect or modify its properties.</p>
+                            
+                            <!-- Properties Panel -->
+                            <div class="studio-properties">
+                                <div class="panel-header">
+                                    <span>Properties</span>
+                                </div>
+                                <div class="properties-container" id="scene-properties-panel">
+                                    <!-- Selected details show here -->
+                                    <div class="empty-selection-message">
+                                        Select an object to edit properties
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -456,7 +458,6 @@ res = (x + 10) * 2</code></pre>
     <div class="toast-container" id="toast-container"></div>
 
     <!-- Main Logic Bundle -->
-    <script src="scene_editor.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

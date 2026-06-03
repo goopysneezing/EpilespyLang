@@ -4,9 +4,10 @@ win = gameWindow3D("Level Loading Test", 800, 600)
 # Create a test scene file programmatically
 sceneContent = "# EpilepsyLang Scene File\n"
 sceneContent = sceneContent + "grid 0 0 30 2 gray\n"
-sceneContent = sceneContent + "cube 0 1.0 0 4.0 2.0 1.0 red\n"
-sceneContent = sceneContent + "tree -3 0 -3 2.0 1.5\n"
-sceneContent = sceneContent + "model 3 0 3 1.5 1.5 1.5 0 0.5 0 assets/rock.obj yellow\n"
+sceneContent = sceneContent + "cube 0 1.0 0 4.0 2.0 1.0 red Neon false false MyGlowingBox\n"
+sceneContent = sceneContent + "tree -3 0 -3 2.0 1.5 Plastic true true SturdyTree\n"
+sceneContent = sceneContent + "model 3 0 3 1.5 1.5 1.5 0 0.5 0 assets/rock.obj yellow Metal true false MetallicRock\n"
+
 
 print("Writing my_temp_map.epscene...")
 writeFile("my_temp_map.epscene", sceneContent)
