@@ -255,6 +255,7 @@ public:
 
 class Stmt {
 public:
+    int line = 0;
     virtual ~Stmt() = default;
     virtual void accept(StmtVisitor* visitor) = 0;
 };

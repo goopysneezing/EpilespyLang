@@ -290,6 +290,7 @@ private:
 
     // Statements
     StmtPtr statement() {
+        Token firstToken = peek();
         skipNewlines();
 
         // Check for redundant 'let' keyword (e.g. let x = 5)
@@ -302,38 +303,42 @@ private:
             }
         }
 
-        if (match(TokenType::LEFT_BRACE)) return block();
-        if (match(TokenType::IF)) return ifStatement();
-        if (match(TokenType::WHILE)) return whileStatement();
-        if (match(TokenType::FOR)) return forStatement();
-        if (match(TokenType::SWITCH)) return switchStatement();
-        if (match(TokenType::QBREAK)) {
+        StmtPtr stmt = nullptr;
+
+        if (match(TokenType::LEFT_BRACE)) stmt = block();
+        else if (match(TokenType::IF)) stmt = ifStatement();
+        else if (match(TokenType::WHILE)) stmt = whileStatement();
+        else if (match(TokenType::FOR)) stmt = forStatement();
+        else if (match(TokenType::SWITCH)) stmt = switchStatement();
+        else if (match(TokenType::QBREAK)) {
             Token token = previous();
             consumeStatementTerminator();
-            return std::make_shared<QbreakStmt>(token);
+            stmt = std::make_shared<QbreakStmt>(token);
         }
-        if (match(TokenType::QKILLOTHERS)) {
+        else if (match(TokenType::QKILLOTHERS)) {
             Token token = previous();
             consumeStatementTerminator();
-            return std::make_shared<QkillothersStmt>(token);
+            stmt = std::make_shared<QkillothersStmt>(token);
+        }
+        else if (check(TokenType::IDENTIFIER) && peek().lexeme == "print" && current + 1 < tokens.size() && tokens[current + 1].type != TokenType::LEFT_PAREN) {
+            Token printToken = advance(); // consume 'print'
+            std::cout << "[Auto-Fix] Added missing '(' and ')' for print\n";
+            ExprPtr arg = expression();
+            consumeStatementTerminator();
+            
+            ExprPtr callee = std::make_shared<VariableExpr>(printToken);
+            std::vector<ExprPtr> arguments = { arg };
+            ExprPtr call = std::make_shared<CallExpr>(printToken, arguments);
+            stmt = std::make_shared<ExpressionStmt>(call);
+        }
+        else {
+            stmt = expressionStatement();
         }
 
-        // Check for print statement without parentheses (e.g. print 1;)
-        if (check(TokenType::IDENTIFIER) && peek().lexeme == "print") {
-            if (current + 1 < tokens.size() && tokens[current + 1].type != TokenType::LEFT_PAREN) {
-                Token printToken = advance(); // consume 'print'
-                std::cout << "[Auto-Fix] Added missing '(' and ')' for print\n";
-                ExprPtr arg = expression();
-                consumeStatementTerminator();
-                
-                ExprPtr callee = std::make_shared<VariableExpr>(printToken);
-                std::vector<ExprPtr> arguments = { arg };
-                ExprPtr call = std::make_shared<CallExpr>(printToken, arguments);
-                return std::make_shared<ExpressionStmt>(call);
-            }
+        if (stmt != nullptr) {
+            stmt->line = firstToken.line;
         }
-
-        return expressionStatement();
+        return stmt;
     }
 
     std::vector<StmtPtr> parseStatementsList(TokenType endType) {
@@ -341,13 +346,16 @@ private:
         skipNewlines();
         while (!check(endType) && !isAtEnd()) {
             if (match(TokenType::QUANTUM)) {
+                Token quantumToken = previous();
                 Token name = consume(TokenType::IDENTIFIER, "Expect variable name after 'quantum'.");
                 consume(TokenType::EQUAL, "Expect '=' after variable name.");
                 ExprPtr choices = expression();
                 consumeStatementTerminator();
                 
                 std::vector<StmtPtr> body = parseStatementsList(endType);
-                statements.push_back(std::make_shared<QuantumStmt>(name, choices, body));
+                auto stmt = std::make_shared<QuantumStmt>(name, choices, body);
+                stmt->line = quantumToken.line;
+                statements.push_back(stmt);
                 break;
             }
             statements.push_back(statement());

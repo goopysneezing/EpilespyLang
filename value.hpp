@@ -55,6 +55,17 @@ public:
     }
 };
 
+class GotoException : public std::exception {
+public:
+    std::string file;
+    std::string target;
+    GotoException(const std::string& file, const std::string& target)
+        : file(file), target(target) {}
+    const char* what() const noexcept override {
+        return "Goto Exception";
+    }
+};
+
 struct Nil {
     bool operator==(const Nil&) const { return true; }
     bool operator!=(const Nil&) const { return false; }

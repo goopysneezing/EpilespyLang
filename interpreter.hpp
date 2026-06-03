@@ -400,9 +400,82 @@ public:
         }
     }
 
-    void interpret(const std::vector<StmtPtr>& statements) {
-        for (auto& stmt : statements) {
-            execute(stmt);
+    std::string currentFilePath = "";
+
+    bool isMatchingLabel(StmtPtr stmt, const std::string& labelName) {
+        auto exprStmt = std::dynamic_pointer_cast<ExpressionStmt>(stmt);
+        if (!exprStmt) return false;
+        
+        auto callExpr = std::dynamic_pointer_cast<CallExpr>(exprStmt->expression);
+        if (!callExpr) return false;
+        
+        if (callExpr->callee.lexeme != "label") return false;
+        if (callExpr->arguments.size() != 1) return false;
+        
+        auto litExpr = std::dynamic_pointer_cast<LiteralExpr>(callExpr->arguments[0]);
+        if (!litExpr) return false;
+        
+        return litExpr->value.isString() && litExpr->value.asString() == labelName;
+    }
+
+    void interpret(const std::vector<StmtPtr>& statements, const std::string& filePath = "") {
+        currentFilePath = filePath;
+        std::vector<StmtPtr> activeStatements = statements;
+        size_t ip = 0;
+
+        while (ip < activeStatements.size()) {
+            try {
+                execute(activeStatements[ip]);
+                ip++;
+            } catch (const GotoException& g) {
+                std::string targetFile = g.file;
+                if (targetFile.empty()) {
+                    targetFile = currentFilePath;
+                }
+
+                if (targetFile != currentFilePath) {
+                    std::string clean = cleanFilePath(targetFile);
+                    if (!fileOrDirExists(clean)) {
+                        throw RuntimeError(activeStatements[ip]->line, "Goto target file not found: " + targetFile);
+                    }
+                    std::string source = readTextFile(clean);
+                    Lexer lexer(source);
+                    auto tokens = lexer.scanTokens();
+                    Parser parser(tokens);
+                    activeStatements = parser.parse();
+                    currentFilePath = targetFile;
+                }
+
+                int targetLine = -1;
+                try {
+                    targetLine = std::stoi(g.target);
+                } catch (...) {
+                    // Target is label name
+                }
+
+                size_t foundIdx = activeStatements.size();
+                if (targetLine != -1) {
+                    for (size_t i = 0; i < activeStatements.size(); ++i) {
+                        if (activeStatements[i]->line >= targetLine) {
+                            foundIdx = i;
+                            break;
+                        }
+                    }
+                } else {
+                    for (size_t i = 0; i < activeStatements.size(); ++i) {
+                        if (isMatchingLabel(activeStatements[i], g.target)) {
+                            foundIdx = i;
+                            break;
+                        }
+                    }
+                }
+
+                if (foundIdx < activeStatements.size()) {
+                    ip = foundIdx;
+                } else {
+                    throw RuntimeError(0, "Goto target not found: " + g.target + " in " + targetFile);
+                }
+            }
         }
     }
 
@@ -1022,6 +1095,43 @@ public:
                 throw RuntimeError(expr->callee.line, "is_admin() expects 0 arguments.");
             }
             return Value(static_cast<bool>(IsUserAnAdmin()));
+        }
+
+        if (calleeName == "goto") {
+            if (args.size() != 1) {
+                throw RuntimeError(expr->callee.line, "goto() expects exactly 1 argument (target).");
+            }
+            std::string targetStr = "";
+            if (args[0].isNumber()) {
+                targetStr = std::to_string(static_cast<int>(args[0].asNumber()));
+            } else if (args[0].isString()) {
+                targetStr = args[0].asString();
+            } else {
+                throw RuntimeError(expr->callee.line, "goto() argument must be a string or number.");
+            }
+
+            std::string file = "";
+            std::string target = targetStr;
+
+            size_t colonPos = targetStr.rfind(':');
+            if (colonPos != std::string::npos && colonPos > 1) {
+                if (targetStr[colonPos - 1] != '\\' && targetStr[colonPos - 1] != '/') {
+                    file = targetStr.substr(0, colonPos);
+                    target = targetStr.substr(colonPos + 1);
+                }
+            }
+
+            throw GotoException(file, target);
+        }
+
+        if (calleeName == "label") {
+            if (args.size() != 1) {
+                throw RuntimeError(expr->callee.line, "label() expects exactly 1 argument (label name).");
+            }
+            if (!args[0].isString()) {
+                throw RuntimeError(expr->callee.line, "label() argument must be a string.");
+            }
+            return Value();
         }
 
         // Mathematical Built-in Functions

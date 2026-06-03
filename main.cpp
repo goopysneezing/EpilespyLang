@@ -106,7 +106,7 @@ void runREPL() {
                 auto tokens = lexer.scanTokens();
                 Parser parser(tokens);
                 auto statements = parser.parse();
-                interpreter.interpret(statements);
+                interpreter.interpret(statements, "repl");
             } catch (const ParseError& e) {
                 std::cerr << "Syntax Error: " << e.what() << "\n";
             } catch (const QuantumBreakException& e) {
@@ -137,7 +137,7 @@ void runFile(const std::string& path) {
         Parser parser(tokens);
         auto statements = parser.parse();
         Interpreter interpreter;
-        interpreter.interpret(statements);
+        interpreter.interpret(statements, path);
     } catch (const ParseError& e) {
         std::cerr << "Syntax Error: " << e.what() << "\n";
         std::exit(1);
